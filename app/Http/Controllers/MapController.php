@@ -8,6 +8,7 @@ use App\Models\Visitor;
 use App\Support\AvatarPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class MapController extends Controller
@@ -15,7 +16,7 @@ class MapController extends Controller
     public function index(Request $request): View
     {
         return view('map.index', [
-            'services' => Service::orderBy('name')->get(['id', 'name', 'slug', 'color']),
+            'services' => $this->interestServices(),
             'privacyVersion' => config('expo.privacy_notice_version'),
             'checkInUrl' => $request->getSchemeAndHttpHost().route('check-in', absolute: false),
         ]);
@@ -24,9 +25,30 @@ class MapController extends Controller
     public function checkIn(): View
     {
         return view('map.checkin', [
-            'services' => Service::orderBy('name')->get(['id', 'name', 'slug', 'color']),
+            'services' => $this->interestServices(),
             'privacyVersion' => config('expo.privacy_notice_version'),
         ]);
+    }
+
+    /**
+     * @return Collection<int, Service>
+     */
+    private function interestServices()
+    {
+        if (Service::query()->doesntExist()) {
+            foreach ([
+                ['name' => 'GIS / Geospatial', 'slug' => 'gis', 'color' => '#38bdf8'],
+                ['name' => 'Land Management', 'slug' => 'land', 'color' => '#34d399'],
+                ['name' => 'Software / IT', 'slug' => 'software', 'color' => '#a78bfa'],
+                ['name' => 'Data Analytics', 'slug' => 'analytics', 'color' => '#fbbf24'],
+                ['name' => 'System Integration', 'slug' => 'integration', 'color' => '#fb7185'],
+                ['name' => 'Other', 'slug' => 'other', 'color' => '#94a3b8'],
+            ] as $service) {
+                Service::query()->create($service);
+            }
+        }
+
+        return Service::query()->orderBy('name')->get(['id', 'name', 'slug', 'color']);
     }
 
     public function companies(Request $request): JsonResponse
@@ -150,7 +172,7 @@ class MapController extends Controller
     public function services(): JsonResponse
     {
         return response()->json([
-            'services' => Service::orderBy('name')->get(['id', 'name', 'slug', 'color']),
+            'services' => $this->interestServices()->values(),
         ]);
     }
 }

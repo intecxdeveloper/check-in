@@ -31,13 +31,9 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     let uploadedFile = null;
     let selectedPreset = PRESET_AVATARS[0];
 
-    interestOptions.innerHTML = services.map((service) => `
-        <label class="interest-option" style="--interest-color:${escapeHtml(service.color || '#007aff')}">
-            <input type="checkbox" name="services[]" value="${escapeHtml(String(service.id))}">
-            <span class="interest-option-swatch" aria-hidden="true"></span>
-            <span class="interest-option-label">${escapeHtml(service.name)}</span>
-        </label>
-    `).join('');
+    renderInterestOptions(services);
+    bindInterestChips();
+    ensureInterestOptions();
 
     renderAvatarPresets();
     setPresetAvatar(selectedPreset);
@@ -171,6 +167,66 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         uploadedFile = null;
         if (avatarFileInput) avatarFileInput.value = '';
         avatarClearBtn?.classList.add('hidden');
+    }
+
+    function renderInterestOptions(list) {
+        if (! interestOptions || ! Array.isArray(list) || ! list.length) {
+            return;
+        }
+
+        interestOptions.innerHTML = list.map((service) => {
+            const color = escapeHtml(service.color || '#007aff');
+            return `
+                <div class="interest-chip" style="--interest-color:${color};display:flex;align-items:center;gap:0.65rem;min-height:54px;padding:0.85rem 0.95rem;margin:0;border-radius:1rem;border:1.5px solid rgba(0,0,0,.12);background:#f5f5f7;color:#1d1d1f;font-weight:700;font-size:1rem;">
+                    <input type="checkbox" name="services[]" value="${escapeHtml(String(service.id))}" style="width:1.2rem;height:1.2rem;flex:none;margin:0;">
+                    <span class="interest-option-swatch" aria-hidden="true" style="width:.7rem;height:.7rem;border-radius:999px;background:${color};flex:none;"></span>
+                    <span class="interest-option-label" style="color:#1d1d1f;font-weight:700;">${escapeHtml(service.name)}</span>
+                </div>
+            `;
+        }).join('');
+
+        bindInterestChips();
+        root.querySelector('#interest-empty-hint')?.remove();
+    }
+
+    function bindInterestChips() {
+        if (! interestOptions || interestOptions.dataset.bound === '1') {
+            return;
+        }
+        interestOptions.dataset.bound = '1';
+        interestOptions.addEventListener('click', (event) => {
+            const chip = event.target.closest('.interest-chip');
+            if (! chip || ! interestOptions.contains(chip)) {
+                return;
+            }
+            if (event.target.matches('input[type="checkbox"]')) {
+                chip.classList.toggle('is-selected', event.target.checked);
+                return;
+            }
+            const input = chip.querySelector('input[type="checkbox"]');
+            if (! input) {
+                return;
+            }
+            input.checked = ! input.checked;
+            chip.classList.toggle('is-selected', input.checked);
+        });
+    }
+
+    async function ensureInterestOptions() {
+        if (! interestOptions) {
+            return;
+        }
+
+        if (interestOptions.querySelectorAll('input[name="services[]"]').length) {
+            return;
+        }
+
+        try {
+            const data = await window.expoFetch('/api/services');
+            renderInterestOptions(data.services || []);
+        } catch (_) {
+            // Server-rendered options (or empty) remain as-is.
+        }
     }
 
     function renderAvatarPresets() {

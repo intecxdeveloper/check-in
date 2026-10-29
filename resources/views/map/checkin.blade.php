@@ -49,7 +49,7 @@
                 <span data-step-dot="6"></span>
             </div>
 
-            @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'showMapLink' => true])
+            @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'showMapLink' => true, 'services' => $services])
         </div>
     </div>
 </div>

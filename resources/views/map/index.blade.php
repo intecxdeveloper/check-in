@@ -68,7 +68,7 @@
                 <span data-step-dot="6"></span>
             </div>
 
-            @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion])
+            @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'services' => $services])
         </div>
     </div>
 </div>

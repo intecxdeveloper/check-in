@@ -56,7 +56,22 @@
 
     <section data-step="3" class="checkin-step hidden">
         <p class="checkin-help">What are you into? Tap as many as you like — no wrong answers.</p>
-        <div id="interest-options" class="interest-grid"></div>
+        <div id="interest-options" class="interest-grid" role="group" aria-label="Interests">
+            @foreach (($services ?? collect()) as $service)
+                {{-- Use div chips (not label) so phone CSS for form labels cannot hide them. --}}
+                <div
+                    class="interest-chip"
+                    style="--interest-color: {{ $service->color ?: '#007aff' }}; display:flex; align-items:center; gap:0.65rem; min-height:54px; padding:0.85rem 0.95rem; margin:0; border-radius:1rem; border:1.5px solid rgba(0,0,0,.12); background:#f5f5f7; color:#1d1d1f; font-weight:700; font-size:1rem;"
+                >
+                    <input type="checkbox" name="services[]" value="{{ $service->id }}" style="width:1.2rem;height:1.2rem;flex:none;margin:0;">
+                    <span class="interest-option-swatch" aria-hidden="true" style="width:.7rem;height:.7rem;border-radius:999px;background:{{ $service->color ?: '#007aff' }};flex:none;"></span>
+                    <span class="interest-option-label" style="color:#1d1d1f;font-weight:700;">{{ $service->name }}</span>
+                </div>
+            @endforeach
+        </div>
+        @if (($services ?? collect())->isEmpty())
+            <p class="checkin-help" id="interest-empty-hint">Interests are loading… if this stays blank, refresh once.</p>
+        @endif
     </section>
 
     <section data-step="4" class="checkin-step hidden">

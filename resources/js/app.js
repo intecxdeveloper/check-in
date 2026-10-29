@@ -8,11 +8,17 @@ if (root) {
     const maplibregl = window.maplibregl;
 
     if (root.dataset.mode === 'checkin') {
-        const services = JSON.parse(root.dataset.services || '[]');
+        let services = [];
+        try {
+            services = JSON.parse(root.dataset.services || '[]');
+        } catch (_) {
+            services = [];
+        }
+
         const wizard = createCheckInWizard({
             root,
             maplibregl,
-            services,
+            services: Array.isArray(services) ? services : [],
             lockOpen: true,
             onSuccess: async (payload) => {
                 const successAvatar = root.querySelector('#success-avatar');
