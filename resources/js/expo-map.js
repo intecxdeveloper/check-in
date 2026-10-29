@@ -60,15 +60,26 @@ export function createExpoMap(root, maplibregl) {
 
     root.querySelector('#company-card-close')?.addEventListener('click', closeCompanyCard);
 
+    let pollInFlight = false;
     refreshStats().catch((error) => console.error(error));
     refreshRecent({ announce: false }).catch((error) => console.error(error));
-    setInterval(() => {
-        refreshStats().catch((error) => console.error(error));
-        refreshRecent({ announce: true }).catch((error) => console.error(error));
-        if (mapReady) {
-            refreshCompanies({ animateNew: true }).catch((error) => console.error(error));
+    setInterval(async () => {
+        if (pollInFlight || document.hidden) {
+            return;
         }
-    }, 2000);
+        pollInFlight = true;
+        try {
+            await Promise.all([
+                refreshStats().catch((error) => console.error(error)),
+                refreshRecent({ announce: true }).catch((error) => console.error(error)),
+                mapReady
+                    ? refreshCompanies({ animateNew: true }).catch((error) => console.error(error))
+                    : Promise.resolve(),
+            ]);
+        } finally {
+            pollInFlight = false;
+        }
+    }, 5000);
 
     if (maplibregl) {
         initMap();
@@ -154,10 +165,20 @@ export function createExpoMap(root, maplibregl) {
         });
 
         ensureMarkerLayer();
-        map.on('render', syncMarkerPositions);
-        map.on('move', syncMarkerPositions);
-        map.on('zoom', syncMarkerPositions);
-        map.on('resize', syncMarkerPositions);
+        let markerSyncRaf = 0;
+        const scheduleMarkerSync = () => {
+            if (markerSyncRaf) {
+                return;
+            }
+            markerSyncRaf = requestAnimationFrame(() => {
+                markerSyncRaf = 0;
+                syncMarkerPositions();
+            });
+        };
+        map.on('render', scheduleMarkerSync);
+        map.on('move', scheduleMarkerSync);
+        map.on('zoom', scheduleMarkerSync);
+        map.on('resize', scheduleMarkerSync);
 
         const loadTimeout = setTimeout(() => {
             if (! mapReady) {

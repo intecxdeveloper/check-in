@@ -1,4 +1,4 @@
-import { PRESET_AVATARS, avatarUrl } from './avatars';
+import { PRESET_AVATARS, avatarUrl, presetAvatarUrl } from './avatars';
 
 export function createCheckInWizard({ root, maplibregl, services, onSuccess, lockOpen = false }) {
     const modal = root.querySelector('#checkin-modal');
@@ -24,17 +24,18 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     let pinMarker = null;
     let submitting = false;
     let companySearchTimer = null;
+    let companySearchAbort = null;
     let reverseTimer = null;
     let selectedCompany = null;
     let uploadedObjectUrl = null;
     let uploadedFile = null;
-    let selectedPreset = PRESET_AVATARS[0].seed;
+    let selectedPreset = PRESET_AVATARS[0];
 
     interestOptions.innerHTML = services.map((service) => `
-        <label class="interest-option" style="--interest-color:${service.color || '#007aff'}">
-            <input type="checkbox" name="services[]" value="${service.id}">
-            <span style="width:.7rem;height:.7rem;border-radius:999px;background:${service.color || '#007aff'};flex:0 0 auto"></span>
-            <span>${service.name}</span>
+        <label class="interest-option" style="--interest-color:${escapeHtml(service.color || '#007aff')}">
+            <input type="checkbox" name="services[]" value="${escapeHtml(String(service.id))}">
+            <span class="interest-option-swatch" aria-hidden="true"></span>
+            <span class="interest-option-label">${escapeHtml(service.name)}</span>
         </label>
     `).join('');
 
@@ -57,7 +58,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     companyInput?.addEventListener('input', () => {
         selectedCompany = null;
         clearTimeout(companySearchTimer);
-        companySearchTimer = setTimeout(() => searchCompanies(companyInput.value.trim()), 400);
+        companySearchTimer = setTimeout(() => searchCompanies(companyInput.value.trim()), 350);
     });
 
     companyInput?.addEventListener('focus', () => {
@@ -87,7 +88,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
 
     avatarClearBtn?.addEventListener('click', () => {
         clearUpload();
-        setPresetAvatar(selectedPreset || PRESET_AVATARS[0].seed);
+        setPresetAvatar(selectedPreset || PRESET_AVATARS[0]);
     });
 
     const messageInput = root.querySelector('#display-message-input') || form.querySelector('[name="display_message"]');
@@ -144,7 +145,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         }
         selectedCompany = null;
         clearUpload();
-        setPresetAvatar(PRESET_AVATARS[0].seed);
+        setPresetAvatar(PRESET_AVATARS[0]);
         form.querySelector('[name="country"]').value = 'Malaysia';
         form.querySelector('[name="public_display_enabled"]').checked = true;
         hideError();
@@ -176,25 +177,35 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         if (! avatarPresets) return;
         avatarPresets.innerHTML = PRESET_AVATARS.map((preset) => `
             <button type="button" class="avatar-preset" data-seed="${escapeHtml(preset.seed)}" aria-label="${escapeHtml(preset.label)}">
-                <img src="${avatarUrl(preset.seed, 96)}" alt="" width="56" height="56" loading="lazy">
+                <img src="${presetAvatarUrl(preset, 96)}" alt="" width="56" height="56" loading="lazy">
             </button>
         `).join('');
 
         avatarPresets.querySelectorAll('.avatar-preset').forEach((button) => {
             button.addEventListener('click', () => {
                 clearUpload();
-                setPresetAvatar(button.dataset.seed);
+                const preset = PRESET_AVATARS.find((item) => item.seed === button.dataset.seed) || PRESET_AVATARS[0];
+                setPresetAvatar(preset);
             });
         });
     }
 
-    function setPresetAvatar(seed) {
-        selectedPreset = seed;
-        avatarSeedInput.value = seed;
-        avatarPreview.src = avatarUrl(seed, 160);
-        avatarPreviewLabel.textContent = `Preset · ${seed}`;
+    function setPresetAvatar(presetOrSeed) {
+        const preset = typeof presetOrSeed === 'string'
+            ? (PRESET_AVATARS.find((item) => item.seed === presetOrSeed) || {
+                seed: presetOrSeed,
+                label: presetOrSeed,
+            })
+            : presetOrSeed;
+
+        selectedPreset = preset;
+        avatarSeedInput.value = preset.seed;
+        avatarPreview.src = preset.clothing
+            ? presetAvatarUrl(preset, 160)
+            : avatarUrl(preset.seed, 160);
+        avatarPreviewLabel.textContent = `Preset · ${preset.label || preset.seed}`;
         avatarPresets?.querySelectorAll('.avatar-preset').forEach((el) => {
-            el.classList.toggle('active', el.dataset.seed === seed);
+            el.classList.toggle('active', el.dataset.seed === preset.seed);
         });
     }
 
@@ -226,6 +237,12 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         nextBtn.disabled = false;
         nextBtn.textContent = copy.next;
 
+        const sheet = root.querySelector('.checkin-sheet');
+        if (sheet) {
+            sheet.scrollTop = 0;
+        }
+        root.scrollTop = 0;
+
         if (step === 4) {
             prepareLocationStep();
         }
@@ -234,49 +251,42 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     async function searchCompanies(query) {
         if (! companyResults) return;
         if (query.length < 1) {
+            companySearchAbort?.abort();
             companyResults.hidden = true;
             companyResults.innerHTML = '';
             return;
         }
 
+        companySearchAbort?.abort();
+        companySearchAbort = new AbortController();
+        const { signal } = companySearchAbort;
+
         companyResults.hidden = false;
         companyResults.innerHTML = '<li><small>Searching Malaysia companies…</small></li>';
 
         try {
-            const data = await window.expoFetch(`/api/companies/search?q=${encodeURIComponent(query)}`);
+            const data = await window.expoFetch(`/api/companies/search?q=${encodeURIComponent(query)}`, { signal });
+            if (signal.aborted) return;
             const rows = data.results || [];
-            if (! rows.length) {
-                companyResults.innerHTML = `
-                    <li class="company-suggest-custom">
-                        <button type="button" data-custom="1">
-                            <strong>Use “${escapeHtml(query)}”</strong>
-                            <small>Not listed — that’s perfectly fine. You’ll place a pin next.</small>
-                        </button>
-                    </li>
-                `;
-                companyResults.querySelector('button')?.addEventListener('click', () => {
-                    companyInput.value = query;
-                    selectedCompany = null;
-                    companyResults.hidden = true;
-                });
-                return;
-            }
-
-            companyResults.innerHTML = rows.map((row, index) => `
+            const customItem = `
+                <li class="company-suggest-custom">
+                    <button type="button" data-custom="1">
+                        <strong>Use “${escapeHtml(query)}”</strong>
+                        <small>${rows.length ? 'Not in the list? That’s fine — place a pin next.' : 'Not listed — that’s perfectly fine. You’ll place a pin next.'}</small>
+                    </button>
+                </li>
+            `;
+            const matchItems = rows.map((row, index) => `
                 <li>
                     <button type="button" data-company-index="${index}">
                         <strong>${escapeHtml(row.name)}</strong>
                         <small>${escapeHtml(row.location || 'Malaysia')}${row.has_location ? '' : ' · place on map next'}</small>
                     </button>
                 </li>
-            `).join('') + `
-                <li class="company-suggest-custom">
-                    <button type="button" data-custom="1">
-                        <strong>Use “${escapeHtml(query)}” instead</strong>
-                        <small>Type your own if none of these match</small>
-                    </button>
-                </li>
-            `;
+            `).join('');
+
+            // Custom name first so unlisted companies are always one tap away.
+            companyResults.innerHTML = customItem + matchItems;
 
             companyResults.querySelectorAll('[data-company-index]').forEach((button) => {
                 button.addEventListener('click', () => {
@@ -289,6 +299,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
                 companyResults.hidden = true;
             });
         } catch (error) {
+            if (error?.name === 'AbortError' || signal.aborted) return;
             companyResults.innerHTML = `
                 <li class="company-suggest-custom">
                     <button type="button" data-custom="1">

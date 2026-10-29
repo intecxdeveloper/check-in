@@ -7,6 +7,8 @@ use App\Models\Company;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -42,7 +44,7 @@ class CompanySearchController extends Controller
             });
 
         collect(config('malaysia_companies', []))
-            ->filter(fn (array $row) => str_contains(Str::lower($row['name']), $needle))
+            ->filter(fn (array $row) => $this->matchesNeedle(Str::lower($row['name']), $needle))
             ->take(10)
             ->each(function (array $row) use ($results) {
                 $key = Str::lower($row['name']);
@@ -64,12 +66,15 @@ class CompanySearchController extends Controller
                 ]);
             });
 
-        foreach ($this->openCorporates($validated['q']) as $row) {
-            $key = Str::lower($row['name']);
-            if ($results->contains(fn ($item) => Str::lower($item['name']) === $key)) {
-                continue;
+        // Remote registry only when a token is configured and local search found nothing.
+        if ($this->shouldQueryOpenCorporates($results, $needle)) {
+            foreach ($this->openCorporatesCached($validated['q']) as $row) {
+                $key = Str::lower($row['name']);
+                if ($results->contains(fn ($item) => Str::lower($item['name']) === $key)) {
+                    continue;
+                }
+                $results->push($row);
             }
-            $results->push($row);
         }
 
         return response()->json([
@@ -80,17 +85,76 @@ class CompanySearchController extends Controller
     }
 
     /**
+     * @param  Collection<int, array<string, mixed>>  $results
+     */
+    private function shouldQueryOpenCorporates($results, string $needle): bool
+    {
+        if (! config('expo.company_search_opencorporates', true)) {
+            return false;
+        }
+
+        if (! filled(config('expo.opencorporates_api_token'))) {
+            return false;
+        }
+
+        return $results->isEmpty() && Str::length($needle) >= 2;
+    }
+
+    private function matchesNeedle(string $haystack, string $needle): bool
+    {
+        if ($needle === '') {
+            return false;
+        }
+
+        if (str_contains($haystack, $needle)) {
+            return true;
+        }
+
+        $tokens = preg_split('/\s+/', $needle) ?: [];
+
+        return collect($tokens)
+            ->filter(fn (string $token) => Str::length($token) >= 2)
+            ->isNotEmpty()
+            && collect($tokens)
+                ->filter(fn (string $token) => Str::length($token) >= 2)
+                ->every(fn (string $token) => str_contains($haystack, $token));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function openCorporatesCached(string $query): array
+    {
+        $key = 'company-search:oc:my:'.md5(Str::lower(trim($query)));
+
+        /** @var array<int, array<string, mixed>> $rows */
+        $rows = Cache::remember($key, now()->addHours(6), function () use ($query) {
+            return $this->openCorporates($query);
+        });
+
+        if ($rows === []) {
+            Cache::put($key, [], now()->addMinutes(2));
+        }
+
+        return $rows;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function openCorporates(string $query): array
     {
+        $token = config('expo.opencorporates_api_token');
+
         try {
-            $response = Http::timeout(4)
+            $response = Http::connectTimeout(1)
+                ->timeout(2)
                 ->acceptJson()
                 ->get('https://api.opencorporates.com/v0.4/companies/search', [
                     'q' => $query,
                     'jurisdiction_code' => 'my',
-                    'per_page' => 5,
+                    'per_page' => 8,
+                    'api_token' => $token,
                 ]);
         } catch (ConnectionException) {
             return [];

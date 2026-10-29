@@ -7,22 +7,49 @@ const AVATAR_COLORS = [
     'c1f4c5',
 ];
 
+/** Soft booth vibe, but dress-code locked to blazers / collars. */
+const CORPORATE_LOOK = {
+    clothing: 'blazerAndShirt,blazerAndSweater,collarAndSweater',
+    clothingColor: '262e33,3c4f5c,5199e4,25557c,65c9ff,929598',
+    accessories: 'prescription01,prescription02,round,wayfarers',
+    accessoriesProbability: '28',
+    facialHairProbability: '12',
+    mouth: 'smile,default,twinkle',
+    eyebrows: 'default,defaultNatural,flatNatural',
+};
+
 export const PRESET_AVATARS = [
-    { seed: 'Aisha', label: 'Aisha' },
-    { seed: 'Daniel', label: 'Daniel' },
-    { seed: 'Nurul', label: 'Nurul' },
-    { seed: 'Farid', label: 'Farid' },
-    { seed: 'Mei', label: 'Mei' },
-    { seed: 'Arif', label: 'Arif' },
-    { seed: 'Priya', label: 'Priya' },
-    { seed: 'Jason', label: 'Jason' },
+    { seed: 'AishaCorp', label: 'Aisha', clothing: 'blazerAndShirt', clothingColor: '25557c' },
+    { seed: 'DanielCorp', label: 'Daniel', clothing: 'blazerAndSweater', clothingColor: '262e33' },
+    { seed: 'NurulCorp', label: 'Nurul', clothing: 'collarAndSweater', clothingColor: '5199e4' },
+    { seed: 'FaridCorp', label: 'Farid', clothing: 'blazerAndShirt', clothingColor: '3c4f5c' },
+    { seed: 'MeiCorp', label: 'Mei', clothing: 'blazerAndSweater', clothingColor: '65c9ff' },
+    { seed: 'ArifCorp', label: 'Arif', clothing: 'blazerAndShirt', clothingColor: '262e33' },
+    { seed: 'PriyaCorp', label: 'Priya', clothing: 'collarAndSweater', clothingColor: '25557c' },
+    { seed: 'JasonCorp', label: 'Jason', clothing: 'blazerAndSweater', clothingColor: '929598' },
 ];
 
-export function avatarUrl(seed, size = 128) {
-    const safeSeed = encodeURIComponent(String(seed || 'friend').trim() || 'friend');
-    const backgrounds = AVATAR_COLORS.join(',');
+export function avatarUrl(seed, size = 128, extras = {}) {
+    const safeSeed = String(seed || 'friend').trim() || 'friend';
+    const params = new URLSearchParams({
+        seed: safeSeed,
+        size: String(size),
+        backgroundColor: AVATAR_COLORS.join(','),
+        radius: '50',
+        ...CORPORATE_LOOK,
+        ...Object.fromEntries(
+            Object.entries(extras).filter(([, value]) => value != null && value !== '')
+        ),
+    });
 
-    return `https://api.dicebear.com/9.x/avataaars/svg?seed=${safeSeed}&size=${size}&backgroundColor=${backgrounds}&radius=50`;
+    return `https://api.dicebear.com/9.x/avataaars/svg?${params.toString()}`;
+}
+
+export function presetAvatarUrl(preset, size = 128) {
+    return avatarUrl(preset.seed, size, {
+        clothing: preset.clothing,
+        clothingColor: preset.clothingColor,
+    });
 }
 
 export function resolveAvatarUrl({ avatarUrl: customUrl, seed, name, size = 128 } = {}) {

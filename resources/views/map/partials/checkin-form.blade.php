@@ -4,7 +4,7 @@
 
         <div class="avatar-studio">
             <div class="avatar-studio-preview">
-                <img id="avatar-preview" class="avatar-preview-img" src="https://api.dicebear.com/9.x/avataaars/svg?seed=Aisha&backgroundColor=ffd5dc,b6e3f4,c1f4c5&radius=50" alt="Avatar preview" width="96" height="96">
+                <img id="avatar-preview" class="avatar-preview-img" src="https://api.dicebear.com/9.x/avataaars/svg?seed=AishaCorp&size=96&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf,c1f4c5&radius=50&clothing=blazerAndShirt&clothingColor=25557c&mouth=smile,default,twinkle" alt="Avatar preview" width="96" height="96">
                 <p class="checkin-help" id="avatar-preview-label">Preset · Aisha</p>
             </div>
 
@@ -23,7 +23,7 @@
             </div>
         </div>
 
-        <input type="hidden" name="avatar_seed" id="avatar-seed" value="Aisha">
+        <input type="hidden" name="avatar_seed" id="avatar-seed" value="AishaCorp">
 
         <label>Your name
             <input type="text" name="full_name" required maxlength="120" autocomplete="name" placeholder="Aisha">

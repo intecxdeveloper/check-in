@@ -14,9 +14,9 @@
 
     <div class="checkin-only-hero">
         <div class="expo-brand-avatars" aria-hidden="true">
-            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=booth1&backgroundColor=ffd5dc" alt="">
-            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=booth2&backgroundColor=b6e3f4" alt="">
-            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=booth3&backgroundColor=c1f4c5" alt="">
+            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=boothLead1&backgroundColor=ffd5dc&clothing=blazerAndShirt&clothingColor=25557c&accessoriesProbability=0&facialHairProbability=0&mouth=smile&radius=50" alt="">
+            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=boothLead2&backgroundColor=b6e3f4&clothing=blazerAndSweater&clothingColor=262e33&accessoriesProbability=0&facialHairProbability=10&mouth=smile&radius=50" alt="">
+            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=boothLead3&backgroundColor=c1f4c5&clothing=collarAndSweater&clothingColor=5199e4&accessoriesProbability=0&facialHairProbability=0&mouth=smile&radius=50" alt="">
         </div>
         <h1>Join the Malaysia map</h1>
         <p>Pick an avatar, find your company, drop a pin — then watch yourself appear on the big screen.</p>

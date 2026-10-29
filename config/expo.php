@@ -8,4 +8,8 @@ return [
     ),
     // Clean light vector style — fits the premium white booth UI.
     'map_style' => env('EXPO_MAP_STYLE', 'https://tiles.openfreemap.org/styles/liberty'),
+
+    // OpenCorporates needs a token (free tier). Without it, search uses local directory only.
+    'company_search_opencorporates' => env('EXPO_COMPANY_SEARCH_OPENCORPORATES', true),
+    'opencorporates_api_token' => env('OPENCORPORATES_API_TOKEN'),
 ];

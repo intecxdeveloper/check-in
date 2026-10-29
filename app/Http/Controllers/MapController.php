@@ -101,16 +101,13 @@ class MapController extends Controller
             ->whereNotNull('longitude');
 
         $regions = (clone $publicCompanies)
-            ->get(['city', 'region', 'country'])
-            ->map(fn (Company $c) => $c->region ?: $c->country ?: $c->city)
-            ->filter()
-            ->unique()
-            ->count();
+            ->selectRaw("COUNT(DISTINCT COALESCE(NULLIF(region, ''), NULLIF(country, ''), NULLIF(city, ''))) as aggregate")
+            ->value('aggregate');
 
         return response()->json([
             'check_ins' => Visitor::count(),
             'companies' => (clone $publicCompanies)->count(),
-            'regions' => $regions,
+            'regions' => (int) $regions,
             'generated_at' => now()->toIso8601String(),
         ]);
     }
