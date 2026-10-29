@@ -1,0 +1,138 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Company;
+use App\Models\Service;
+use App\Models\Visitor;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class MapController extends Controller
+{
+    public function index(Request $request): View
+    {
+        return view('map.index', [
+            'services' => Service::orderBy('name')->get(['id', 'name', 'slug', 'color']),
+            'privacyVersion' => config('expo.privacy_notice_version'),
+            'checkInUrl' => $request->getSchemeAndHttpHost().route('check-in', absolute: false),
+        ]);
+    }
+
+    public function checkIn(): View
+    {
+        return view('map.checkin', [
+            'services' => Service::orderBy('name')->get(['id', 'name', 'slug', 'color']),
+            'privacyVersion' => config('expo.privacy_notice_version'),
+        ]);
+    }
+
+    public function companies(Request $request): JsonResponse
+    {
+        $query = Company::query()
+            ->with(['services:id,name,slug,color'])
+            ->withCount('visitors')
+            ->where('public_display_enabled', true)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude');
+
+        if ($service = $request->string('service')->toString()) {
+            $query->whereHas('services', fn ($q) => $q->where('slug', $service));
+        }
+
+        if ($region = $request->string('region')->toString()) {
+            $query->where(function ($q) use ($region) {
+                $q->where('region', $region)
+                    ->orWhere('country', $region)
+                    ->orWhere('city', $region);
+            });
+        }
+
+        $since = $request->string('since')->toString();
+        if ($since !== '') {
+            $query->where('updated_at', '>=', $since);
+        }
+
+        $companies = $query->latest('updated_at')->get();
+        $latestMessages = Visitor::query()
+            ->whereIn('company_id', $companies->pluck('id'))
+            ->whereNotNull('display_message')
+            ->where('display_message', '!=', '')
+            ->latest('id')
+            ->get(['company_id', 'display_message'])
+            ->unique('company_id')
+            ->keyBy('company_id');
+
+        $features = $companies->map(function (Company $company) use ($latestMessages) {
+            $company->latest_public_message = $latestMessages->get($company->id)?->display_message ?? '';
+
+            return $company->toPublicMapFeature();
+        })->values();
+
+        return response()->json([
+            'type' => 'FeatureCollection',
+            'features' => $features,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    public function stats(): JsonResponse
+    {
+        $publicCompanies = Company::query()
+            ->where('public_display_enabled', true)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude');
+
+        $regions = (clone $publicCompanies)
+            ->get(['city', 'region', 'country'])
+            ->map(fn (Company $c) => $c->region ?: $c->country ?: $c->city)
+            ->filter()
+            ->unique()
+            ->count();
+
+        return response()->json([
+            'check_ins' => Visitor::count(),
+            'companies' => (clone $publicCompanies)->count(),
+            'regions' => $regions,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    public function recent(): JsonResponse
+    {
+        $items = Visitor::query()
+            ->with(['company:id,name,city,region,country,public_display_enabled,latitude,longitude'])
+            ->latest()
+            ->limit(12)
+            ->get()
+            ->map(function (Visitor $visitor) {
+                $company = $visitor->company;
+
+                $firstName = trim(explode(' ', trim((string) $visitor->full_name))[0] ?? '');
+
+                return [
+                    'id' => $visitor->id,
+                    'company_id' => $company?->id,
+                    'first_name' => $firstName !== '' ? $firstName : null,
+                    'company' => $company?->name,
+                    'location' => $company?->locationLabel(),
+                    'message' => $visitor->display_message,
+                    'public' => (bool) $company?->public_display_enabled,
+                    'latitude' => $company?->latitude,
+                    'longitude' => $company?->longitude,
+                    'at' => $visitor->created_at?->diffForHumans(),
+                    'created_at' => $visitor->created_at?->toIso8601String(),
+                ];
+            });
+
+        return response()->json(['items' => $items]);
+    }
+
+    public function services(): JsonResponse
+    {
+        return response()->json([
+            'services' => Service::orderBy('name')->get(['id', 'name', 'slug', 'color']),
+        ]);
+    }
+}
