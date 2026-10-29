@@ -1,5 +1,5 @@
 import { createCheckInWizard } from './checkin-wizard';
-import { avatarUrl } from './avatars';
+import { avatarUrl, resolveAvatarUrl } from './avatars';
 
 export function createExpoMap(root, maplibregl) {
     const mapStyle = root.dataset.mapStyle;
@@ -87,11 +87,15 @@ export function createExpoMap(root, maplibregl) {
                 company: companyName,
                 message: payload.display_message || 'Welcome to the map!',
                 location: payload.company?.properties?.location || 'Malaysia',
+                avatar_url: payload.avatar_url || payload.company?.properties?.avatar_url,
             });
 
             await Promise.all([refreshStats(), refreshRecent({ announce: false })]);
 
             if (payload.company && mapReady) {
+                if (payload.display_message) {
+                    payload.company.properties.message = payload.display_message;
+                }
                 await refreshCompanies({ animateNew: true, highlightId: payload.company.properties.id });
                 const [lng, lat] = payload.company.geometry.coordinates;
                 map.flyTo({
@@ -119,17 +123,20 @@ export function createExpoMap(root, maplibregl) {
     }
 
     function initMap() {
-        const malaysia = {
-            center: [108.2, 3.9],
-            zoom: 5.1,
-        };
+        // Mercator + projected DOM pins keep avatars locked to real lat/lng.
+        // Globe projection was drifting markers away from cities.
+        const malaysiaBounds = [
+            [99.4, 0.85],
+            [119.4, 7.55],
+        ];
 
         map = new maplibregl.Map({
             container: 'map',
             style: mapStyle,
-            center: malaysia.center,
-            zoom: malaysia.zoom,
+            bounds: malaysiaBounds,
+            fitBoundsOptions: { padding: 48 },
             pitch: 0,
+            maxPitch: 0,
             attributionControl: false,
             failIfMajorPerformanceCaveat: false,
         });
@@ -140,21 +147,17 @@ export function createExpoMap(root, maplibregl) {
 
         map.on('style.load', () => {
             try {
-                map.setProjection({ type: 'globe' });
-                map.setSky({
-                    'atmosphere-blend': [
-                        'interpolate',
-                        ['linear'],
-                        ['zoom'],
-                        0, 1,
-                        4, 1,
-                        6.5, 0,
-                    ],
-                });
-            } catch (error) {
-                console.warn('Globe projection unavailable, staying on flat map.', error);
+                map.setProjection({ type: 'mercator' });
+            } catch (_) {
+                // Ignore if projection API is unavailable.
             }
         });
+
+        ensureMarkerLayer();
+        map.on('render', syncMarkerPositions);
+        map.on('move', syncMarkerPositions);
+        map.on('zoom', syncMarkerPositions);
+        map.on('resize', syncMarkerPositions);
 
         const loadTimeout = setTimeout(() => {
             if (! mapReady) {
@@ -166,10 +169,44 @@ export function createExpoMap(root, maplibregl) {
             clearTimeout(loadTimeout);
             hideMapFallback();
 
+            map.fitBounds(malaysiaBounds, { padding: 48, duration: 0 });
             mapReady = true;
             window.__expoMap = map;
             await refreshCompanies({ animateNew: false });
+            syncMarkerPositions();
         });
+    }
+
+    function ensureMarkerLayer() {
+        if (! map || root.querySelector('#avatar-marker-layer')) {
+            return root.querySelector('#avatar-marker-layer');
+        }
+
+        const layer = document.createElement('div');
+        layer.id = 'avatar-marker-layer';
+        layer.className = 'avatar-marker-layer';
+        map.getCanvasContainer().appendChild(layer);
+        return layer;
+    }
+
+    function syncMarkerPositions() {
+        if (! map) {
+            return;
+        }
+
+        for (const entry of markersById.values()) {
+            const point = map.project(entry.lngLat);
+            const width = map.getContainer().clientWidth;
+            const height = map.getContainer().clientHeight;
+            const visible = Number.isFinite(point.x) && Number.isFinite(point.y)
+                && point.x > -120 && point.y > -120
+                && point.x < width + 120
+                && point.y < height + 120;
+
+            entry.el.style.opacity = visible ? '1' : '0';
+            entry.el.style.pointerEvents = visible ? 'auto' : 'none';
+            entry.el.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -100%)`;
+        }
     }
 
     async function refreshCompanies({ animateNew = true, highlightId = null } = {}) {
@@ -185,10 +222,11 @@ export function createExpoMap(root, maplibregl) {
         const data = await window.expoFetch(`/api/map/companies?${params.toString()}`);
         const incoming = data.features || [];
         const nextIds = new Set(incoming.map((feature) => String(feature.properties.id)));
+        const layer = ensureMarkerLayer();
 
-        for (const [id, marker] of markersById.entries()) {
+        for (const [id, entry] of markersById.entries()) {
             if (! nextIds.has(id)) {
-                marker.remove();
+                entry.el.remove();
                 markersById.delete(id);
             }
         }
@@ -196,29 +234,33 @@ export function createExpoMap(root, maplibregl) {
         for (const feature of incoming) {
             const id = String(feature.properties.id);
             const props = normalizeProps(feature.properties);
-            const [lng, lat] = feature.geometry.coordinates;
+            const [lng, lat] = feature.geometry.coordinates.map(Number);
+            const lngLat = { lng, lat };
             const isNew = animateNew && ! knownIds.has(Number(id)) && ! knownIds.has(id);
             const shouldPop = isNew || Number(id) === Number(highlightId);
 
             if (markersById.has(id)) {
-                const marker = markersById.get(id);
-                marker.setLngLat([lng, lat]);
-                updatePeopleMarker(marker.getElement(), props, shouldPop);
+                const entry = markersById.get(id);
+                entry.lngLat = lngLat;
+                entry.props = props;
+                updatePeopleMarker(entry.el, props, shouldPop);
             } else {
-                const marker = createPeopleMarker(props, shouldPop);
-                marker.setLngLat([lng, lat]).addTo(map);
-                markersById.set(id, marker);
+                const el = createPeopleMarker(props, shouldPop);
+                layer.appendChild(el);
+                markersById.set(id, { el, lngLat, props });
             }
 
             knownIds.add(Number(id));
             knownIds.add(id);
         }
 
+        syncMarkerPositions();
+
         if (highlightId) {
             const feature = incoming.find((f) => Number(f.properties.id) === Number(highlightId));
             if (feature) {
                 openCompanyCard(normalizeProps(feature.properties));
-                markersById.get(String(highlightId))?.getElement()?.classList.add('avatar-marker--pop');
+                markersById.get(String(highlightId))?.el.classList.add('avatar-marker--pop');
             }
         }
     }
@@ -232,18 +274,18 @@ export function createExpoMap(root, maplibregl) {
             event.stopPropagation();
             openCompanyCard(el._props || props);
         });
-
-        return new maplibregl.Marker({
-            element: el,
-            anchor: 'bottom',
-            pitchAlignment: 'viewport',
-            rotationAlignment: 'viewport',
-        });
+        return el;
     }
 
     function updatePeopleMarker(el, props, pop = false) {
         const seed = String(props.name || props.id || 'friend');
         const message = String(props.message || '').trim();
+        const imageUrl = resolveAvatarUrl({
+            avatarUrl: props.avatar_url,
+            seed,
+            name: props.name,
+            size: 96,
+        });
         el._props = props;
         el.setAttribute('aria-label', props.name || 'Company');
         el.classList.toggle('avatar-marker--has-bubble', Boolean(message));
@@ -254,19 +296,19 @@ export function createExpoMap(root, maplibregl) {
             el.classList.add('avatar-marker--pop');
         }
 
-        if (el.dataset.seed === seed && el.dataset.message === message) {
+        if (el.dataset.seed === seed && el.dataset.message === message && el.dataset.image === imageUrl) {
             return;
         }
 
         el.dataset.seed = seed;
         el.dataset.message = message;
+        el.dataset.image = imageUrl;
         el.innerHTML = `
-            <span class="avatar-marker-inner">
-                ${message ? `<span class="avatar-marker-bubble">${escapeHtml(message)}</span>` : ''}
-                <span class="avatar-marker-face">
-                    <img src="${avatarUrl(seed, 96)}" alt="" width="46" height="46" loading="lazy">
-                </span>
+            ${message ? `<span class="avatar-marker-bubble">${escapeHtml(message)}</span>` : ''}
+            <span class="avatar-marker-face">
+                <img src="${imageUrl}" alt="" width="46" height="46" loading="lazy">
             </span>
+            <span class="avatar-marker-tip" aria-hidden="true"></span>
         `;
     }
 
@@ -344,39 +386,53 @@ export function createExpoMap(root, maplibregl) {
         const name = String(item.first_name || item.company || 'A new friend').trim();
         const message = String(item.message || '').trim();
         const location = String(item.location || 'Malaysia').trim();
+        const imageUrl = resolveAvatarUrl({
+            avatarUrl: item.avatar_url,
+            seed,
+            name: item.company || name,
+            size: 120,
+        });
 
         stopFireworks(toastEl);
+        toastEl.className = 'join-toast hidden';
         toastEl.innerHTML = `
-            <canvas class="join-fireworks" aria-hidden="true"></canvas>
-            <div class="join-card">
-                <p class="join-kicker">Congratulations</p>
-                <img class="join-avatar" src="${avatarUrl(seed, 160)}" alt="" width="88" height="88">
-                <h2 class="join-title"><span>${escapeHtml(name)}</span> has joined!</h2>
-                ${message ? `<p class="join-bubble">${escapeHtml(message)}</p>` : ''}
-                <p class="join-sub">${escapeHtml(item.company && item.first_name ? item.company : location)}</p>
+            <img class="join-toast-avatar" src="${imageUrl}" alt="" width="52" height="52">
+            <div class="join-toast-copy">
+                <p class="join-toast-kicker">Just joined</p>
+                <strong><span>${escapeHtml(name)}</span> is here!</strong>
+                ${message ? `<p class="join-toast-message">${escapeHtml(message)}</p>` : ''}
+                <small>${escapeHtml(item.company && item.first_name ? item.company : location)}</small>
             </div>
         `;
 
         toastEl.classList.remove('hidden');
+        // Restart fly-in animation if another toast is already showing.
+        toastEl.classList.remove('visible', 'leaving');
+        void toastEl.offsetWidth;
         requestAnimationFrame(() => toastEl.classList.add('visible'));
-        startFireworks(toastEl.querySelector('.join-fireworks'));
 
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => {
+            toastEl.classList.add('leaving');
             toastEl.classList.remove('visible');
-            stopFireworks(toastEl);
             setTimeout(() => {
                 toastEl.classList.add('hidden');
+                toastEl.classList.remove('leaving');
                 toastEl.innerHTML = '';
-            }, 420);
-        }, 5600);
+            }, 380);
+        }, 5000);
     }
 
     function openCompanyCard(rawProps) {
         const props = normalizeProps(rawProps);
         const seed = props.name || props.id || 'friend';
         const avatar = companyCard.querySelector('#company-card-avatar');
-        avatar.src = avatarUrl(seed, 128);
+        avatar.src = resolveAvatarUrl({
+            avatarUrl: props.avatar_url,
+            seed,
+            name: props.name,
+            size: 128,
+        });
         avatar.alt = props.name || 'Company avatar';
 
         companyCard.querySelector('#company-card-title').textContent = props.name || 'Company';

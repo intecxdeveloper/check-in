@@ -14,6 +14,8 @@ class Visitor extends Model
         'email',
         'phone',
         'display_message',
+        'avatar_seed',
+        'avatar_path',
         'company_id',
         'follow_up_consent_at',
         'privacy_notice_version',

@@ -1,7 +1,6 @@
 import './bootstrap';
 import { createExpoMap } from './expo-map';
 import { createCheckInWizard } from './checkin-wizard';
-import { avatarUrl } from './avatars';
 
 const root = document.getElementById('expo-app');
 
@@ -17,12 +16,8 @@ if (root) {
             lockOpen: true,
             onSuccess: async (payload) => {
                 const successAvatar = root.querySelector('#success-avatar');
-                if (successAvatar) {
-                    const seed = payload.company?.properties?.name
-                        || root.querySelector('[name="full_name"]')?.value
-                        || 'friend';
-                    successAvatar.src = avatarUrl(seed, 160);
-                    successAvatar.alt = seed;
+                if (successAvatar && payload.avatar_url) {
+                    successAvatar.src = payload.avatar_url;
                 }
             },
         });

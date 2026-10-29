@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\CompanySearchController;
 use App\Http\Controllers\Api\GeocodeController;
 use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\MapController;
@@ -16,14 +17,18 @@ Route::prefix('api')->group(function () {
     Route::get('/map/stats', [MapController::class, 'stats'])->name('api.map.stats');
     Route::get('/map/recent', [MapController::class, 'recent'])->name('api.map.recent');
     Route::get('/services', [MapController::class, 'services'])->name('api.services');
+    // Booth Wi‑Fi shares one public IP — keep these generous for live events.
     Route::get('/geocode', [GeocodeController::class, 'search'])
-        ->middleware('throttle:20,1')
+        ->middleware('throttle:90,1')
         ->name('api.geocode');
     Route::get('/geocode/reverse', [GeocodeController::class, 'reverse'])
-        ->middleware('throttle:30,1')
+        ->middleware('throttle:120,1')
         ->name('api.geocode.reverse');
+    Route::get('/companies/search', CompanySearchController::class)
+        ->middleware('throttle:180,1')
+        ->name('api.companies.search');
     Route::post('/check-in', [CheckInController::class, 'store'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:60,1')
         ->name('api.check-in');
 });
 

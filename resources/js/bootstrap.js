@@ -20,7 +20,12 @@ window.expoFetch = async function expoFetch(url, options = {}) {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-        const error = new Error(payload.message || 'Request failed');
+        let message = payload.message || 'Request failed';
+        if (response.status === 429) {
+            message = payload.message
+                || 'Slow down for a second — too many tries from this network. Try again shortly.';
+        }
+        const error = new Error(message);
         error.status = response.status;
         error.payload = payload;
         throw error;

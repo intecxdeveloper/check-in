@@ -1,4 +1,4 @@
-import { avatarUrl } from './avatars';
+import { PRESET_AVATARS, avatarUrl } from './avatars';
 
 export function createCheckInWizard({ root, maplibregl, services, onSuccess, lockOpen = false }) {
     const modal = root.querySelector('#checkin-modal');
@@ -8,15 +8,27 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     const backBtn = root.querySelector('#checkin-back');
     const interestOptions = root.querySelector('#interest-options');
     const locationResults = root.querySelector('#location-results');
-    const companyInput = root.querySelector('#company-name-input') || form.querySelector('[name="company_name"]');
+    const companyInput = root.querySelector('#company-name-input');
     const companyResults = root.querySelector('#company-results');
+    const avatarPresets = root.querySelector('#avatar-presets');
+    const avatarPreview = root.querySelector('#avatar-preview');
+    const avatarPreviewLabel = root.querySelector('#avatar-preview-label');
+    const avatarSeedInput = root.querySelector('#avatar-seed');
+    const avatarFileInput = root.querySelector('#avatar-file');
+    const avatarClearBtn = root.querySelector('#avatar-clear-upload');
+    const locationBanner = root.querySelector('#location-banner');
+    const locationHelp = root.querySelector('#location-help');
+
     let step = 1;
     let checkinMap = null;
     let pinMarker = null;
     let submitting = false;
-    let knownCompanies = [];
     let companySearchTimer = null;
     let reverseTimer = null;
+    let selectedCompany = null;
+    let uploadedObjectUrl = null;
+    let uploadedFile = null;
+    let selectedPreset = PRESET_AVATARS[0].seed;
 
     interestOptions.innerHTML = services.map((service) => `
         <label class="interest-option" style="--interest-color:${service.color || '#007aff'}">
@@ -26,50 +38,79 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         </label>
     `).join('');
 
-    loadKnownCompanies().catch(() => {});
+    renderAvatarPresets();
+    setPresetAvatar(selectedPreset);
 
     root.querySelector('#checkin-close')?.addEventListener('click', close);
-    root.querySelector('#location-search-btn').addEventListener('click', searchLocation);
-    root.querySelector('#location-query').addEventListener('keydown', (event) => {
+    root.querySelector('#location-search-btn')?.addEventListener('click', searchLocation);
+    root.querySelector('#location-query')?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             event.preventDefault();
             searchLocation();
         }
     });
+    root.querySelector('#location-adjust-btn')?.addEventListener('click', () => {
+        locationBanner.hidden = true;
+        ensureCheckinMap();
+    });
 
     companyInput?.addEventListener('input', () => {
+        selectedCompany = null;
         clearTimeout(companySearchTimer);
-        companySearchTimer = setTimeout(() => renderCompanySuggestions(companyInput.value.trim()), 180);
+        companySearchTimer = setTimeout(() => searchCompanies(companyInput.value.trim()), 400);
     });
 
     companyInput?.addEventListener('focus', () => {
-        renderCompanySuggestions(companyInput.value.trim());
+        if (companyInput.value.trim().length >= 1) {
+            searchCompanies(companyInput.value.trim());
+        }
     });
 
     document.addEventListener('click', (event) => {
-        if (! companyResults) {
-            return;
-        }
-        if (event.target === companyInput || companyResults.contains(event.target)) {
-            return;
-        }
+        if (! companyResults) return;
+        if (event.target === companyInput || companyResults.contains(event.target)) return;
         companyResults.hidden = true;
+    });
+
+    avatarFileInput?.addEventListener('change', () => {
+        const file = avatarFileInput.files?.[0];
+        if (! file) return;
+        if (uploadedObjectUrl) URL.revokeObjectURL(uploadedObjectUrl);
+        uploadedFile = file;
+        uploadedObjectUrl = URL.createObjectURL(file);
+        avatarPreview.src = uploadedObjectUrl;
+        avatarPreviewLabel.textContent = 'Your upload · face or logo';
+        avatarSeedInput.value = '';
+        avatarClearBtn?.classList.remove('hidden');
+        avatarPresets?.querySelectorAll('.avatar-preset').forEach((el) => el.classList.remove('active'));
+    });
+
+    avatarClearBtn?.addEventListener('click', () => {
+        clearUpload();
+        setPresetAvatar(selectedPreset || PRESET_AVATARS[0].seed);
+    });
+
+    const messageInput = root.querySelector('#display-message-input') || form.querySelector('[name="display_message"]');
+    const messagePreview = root.querySelector('#message-bubble-preview-text');
+    messageInput?.addEventListener('input', () => {
+        const text = messageInput.value.trim();
+        if (messagePreview) {
+            messagePreview.textContent = text || 'Your message will show here';
+        }
     });
 
     nextBtn.addEventListener('click', async () => {
         hideError();
-        if (step < 4) {
-            if (!validateStep(step)) return;
+        if (step < 5) {
+            if (! validateStep(step)) return;
             goTo(step + 1);
             return;
         }
-
-        if (step === 4) {
-            if (!validateStep(4)) return;
+        if (step === 5) {
+            if (! validateStep(5)) return;
             await submit();
             return;
         }
-
         if (lockOpen) {
             nextBtn.textContent = 'Done — look at the big screen';
             return;
@@ -79,27 +120,19 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
 
     backBtn?.addEventListener('click', () => {
         hideError();
-        if (step > 1 && step < 5) goTo(step - 1);
+        if (step > 1 && step < 6) goTo(step - 1);
     });
 
     function open() {
-        if (step !== 5) {
-            resetForm();
-        }
+        if (step !== 6) resetForm();
         modal.classList.remove('hidden');
-        goTo(step === 5 ? 5 : 1);
+        goTo(step === 6 ? 6 : 1);
     }
 
     function close() {
-        if (lockOpen && step === 5) {
-            return;
-        }
+        if (lockOpen && step === 6) return;
         modal.classList.add('hidden');
-        if (checkinMap) {
-            checkinMap.remove();
-            checkinMap = null;
-            pinMarker = null;
-        }
+        destroyMap();
     }
 
     function resetForm() {
@@ -109,23 +142,69 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
             companyResults.innerHTML = '';
             companyResults.hidden = true;
         }
+        selectedCompany = null;
+        clearUpload();
+        setPresetAvatar(PRESET_AVATARS[0].seed);
+        form.querySelector('[name="country"]').value = 'Malaysia';
+        form.querySelector('[name="public_display_enabled"]').checked = true;
         hideError();
         submitting = false;
         nextBtn.disabled = false;
         form.querySelector('[name="latitude"]').value = '';
         form.querySelector('[name="longitude"]').value = '';
-        if (pinMarker) {
-            pinMarker.remove();
+        if (locationBanner) locationBanner.hidden = true;
+        destroyMap();
+    }
+
+    function destroyMap() {
+        if (checkinMap) {
+            checkinMap.remove();
+            checkinMap = null;
             pinMarker = null;
         }
     }
 
+    function clearUpload() {
+        if (uploadedObjectUrl) URL.revokeObjectURL(uploadedObjectUrl);
+        uploadedObjectUrl = null;
+        uploadedFile = null;
+        if (avatarFileInput) avatarFileInput.value = '';
+        avatarClearBtn?.classList.add('hidden');
+    }
+
+    function renderAvatarPresets() {
+        if (! avatarPresets) return;
+        avatarPresets.innerHTML = PRESET_AVATARS.map((preset) => `
+            <button type="button" class="avatar-preset" data-seed="${escapeHtml(preset.seed)}" aria-label="${escapeHtml(preset.label)}">
+                <img src="${avatarUrl(preset.seed, 96)}" alt="" width="56" height="56" loading="lazy">
+            </button>
+        `).join('');
+
+        avatarPresets.querySelectorAll('.avatar-preset').forEach((button) => {
+            button.addEventListener('click', () => {
+                clearUpload();
+                setPresetAvatar(button.dataset.seed);
+            });
+        });
+    }
+
+    function setPresetAvatar(seed) {
+        selectedPreset = seed;
+        avatarSeedInput.value = seed;
+        avatarPreview.src = avatarUrl(seed, 160);
+        avatarPreviewLabel.textContent = `Preset · ${seed}`;
+        avatarPresets?.querySelectorAll('.avatar-preset').forEach((el) => {
+            el.classList.toggle('active', el.dataset.seed === seed);
+        });
+    }
+
     const stepCopy = {
-        1: { label: '1 of 4', title: 'Create your pin', next: 'Continue' },
-        2: { label: '2 of 4', title: 'Pick your interests', next: 'Continue' },
-        3: { label: '3 of 4', title: 'Place your avatar', next: 'Continue' },
-        4: { label: '4 of 4', title: 'Almost done', next: 'Add me to the globe' },
-        5: { label: 'Done', title: 'Looking good!', next: 'Back to the map' },
+        1: { label: '1 of 5', title: 'Your look', next: 'Continue' },
+        2: { label: '2 of 5', title: 'Your company', next: 'Continue' },
+        3: { label: '3 of 5', title: 'Interests', next: 'Continue' },
+        4: { label: '4 of 5', title: 'Place your pin', next: 'Continue' },
+        5: { label: '5 of 5', title: 'Almost done', next: 'Join the map' },
+        6: { label: 'Done', title: 'Looking good!', next: 'Back to the map' },
     };
 
     function goTo(nextStep) {
@@ -134,113 +213,158 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
             section.classList.toggle('hidden', Number(section.dataset.step) !== step);
         });
         root.querySelectorAll('[data-step-dot]').forEach((dot) => {
-            dot.classList.toggle('active', Number(dot.dataset.stepDot) <= step);
+            dot.classList.toggle('active', Number(dot.dataset.stepDot) <= Math.min(step, 5));
         });
 
         const copy = stepCopy[step];
         root.querySelector('#checkin-step-label').textContent = copy.label;
-        if (step < 5) {
+        if (step < 6) {
             root.querySelector('#checkin-title').textContent = copy.title;
         }
 
-        backBtn.classList.toggle('hidden', step === 1 || step === 5);
+        backBtn.classList.toggle('hidden', step === 1 || step === 6);
         nextBtn.disabled = false;
         nextBtn.textContent = copy.next;
 
-        if (step === 3) {
-            ensureCheckinMap();
-            maybePlaceFromCompanyName();
+        if (step === 4) {
+            prepareLocationStep();
         }
     }
 
-    async function loadKnownCompanies() {
-        const data = await window.expoFetch('/api/map/companies');
-        knownCompanies = (data.features || []).map((feature) => {
-            const props = feature.properties || {};
-            const [lng, lat] = feature.geometry?.coordinates || [];
-            return {
-                id: props.id,
-                name: props.name,
-                location: props.location,
-                city: props.city,
-                region: props.region,
-                country: props.country,
-                latitude: lat,
-                longitude: lng,
-            };
-        }).filter((item) => item.name && item.latitude != null && item.longitude != null);
-    }
-
-    function renderCompanySuggestions(query) {
-        if (! companyResults) {
-            return;
-        }
-
-        const needle = query.toLowerCase();
-        const matches = knownCompanies
-            .filter((company) => !needle || company.name.toLowerCase().includes(needle))
-            .slice(0, 6);
-
-        if (! matches.length) {
+    async function searchCompanies(query) {
+        if (! companyResults) return;
+        if (query.length < 1) {
             companyResults.hidden = true;
             companyResults.innerHTML = '';
             return;
         }
 
         companyResults.hidden = false;
-        companyResults.innerHTML = matches.map((company, index) => `
-            <li>
-                <button type="button" data-company-index="${index}">
-                    <strong>${escapeHtml(company.name)}</strong>
-                    <small>${escapeHtml(company.location || 'Malaysia')}</small>
-                </button>
-            </li>
-        `).join('');
+        companyResults.innerHTML = '<li><small>Searching Malaysia companies…</small></li>';
 
-        companyResults._matches = matches;
-        companyResults.querySelectorAll('button').forEach((button) => {
-            button.addEventListener('click', () => {
-                const company = matches[Number(button.dataset.companyIndex)];
-                selectCompany(company);
+        try {
+            const data = await window.expoFetch(`/api/companies/search?q=${encodeURIComponent(query)}`);
+            const rows = data.results || [];
+            if (! rows.length) {
+                companyResults.innerHTML = `
+                    <li class="company-suggest-custom">
+                        <button type="button" data-custom="1">
+                            <strong>Use “${escapeHtml(query)}”</strong>
+                            <small>Not listed — that’s perfectly fine. You’ll place a pin next.</small>
+                        </button>
+                    </li>
+                `;
+                companyResults.querySelector('button')?.addEventListener('click', () => {
+                    companyInput.value = query;
+                    selectedCompany = null;
+                    companyResults.hidden = true;
+                });
+                return;
+            }
+
+            companyResults.innerHTML = rows.map((row, index) => `
+                <li>
+                    <button type="button" data-company-index="${index}">
+                        <strong>${escapeHtml(row.name)}</strong>
+                        <small>${escapeHtml(row.location || 'Malaysia')}${row.has_location ? '' : ' · place on map next'}</small>
+                    </button>
+                </li>
+            `).join('') + `
+                <li class="company-suggest-custom">
+                    <button type="button" data-custom="1">
+                        <strong>Use “${escapeHtml(query)}” instead</strong>
+                        <small>Type your own if none of these match</small>
+                    </button>
+                </li>
+            `;
+
+            companyResults.querySelectorAll('[data-company-index]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    applyCompany(rows[Number(button.dataset.companyIndex)]);
+                });
             });
-        });
+            companyResults.querySelector('[data-custom]')?.addEventListener('click', () => {
+                companyInput.value = query;
+                selectedCompany = null;
+                companyResults.hidden = true;
+            });
+        } catch (error) {
+            companyResults.innerHTML = `
+                <li class="company-suggest-custom">
+                    <button type="button" data-custom="1">
+                        <strong>Use “${escapeHtml(query)}”</strong>
+                        <small>Search is quiet right now — typing your company still works.</small>
+                    </button>
+                </li>
+            `;
+            companyResults.querySelector('button')?.addEventListener('click', () => {
+                companyInput.value = query;
+                selectedCompany = null;
+                companyResults.hidden = true;
+            });
+        }
     }
 
-    function selectCompany(company) {
+    function applyCompany(company) {
+        selectedCompany = company;
         companyInput.value = company.name;
         form.querySelector('[name="city"]').value = company.city || '';
         form.querySelector('[name="region"]').value = company.region || '';
         form.querySelector('[name="country"]').value = company.country || 'Malaysia';
         form.querySelector('[name="address_text"]').value = company.location || company.name;
-        if (companyResults) {
-            companyResults.hidden = true;
+        if (company.website) {
+            form.querySelector('[name="public_website"]').value = company.website;
         }
-        setPin(company.longitude, company.latitude, { reverse: false, fly: true });
+        companyResults.hidden = true;
+
+        if (company.has_location && company.latitude != null && company.longitude != null) {
+            form.querySelector('[name="latitude"]').value = Number(company.latitude).toFixed(7);
+            form.querySelector('[name="longitude"]').value = Number(company.longitude).toFixed(7);
+        } else {
+            form.querySelector('[name="latitude"]').value = '';
+            form.querySelector('[name="longitude"]').value = '';
+        }
     }
 
-    function maybePlaceFromCompanyName() {
-        const name = companyInput?.value.trim().toLowerCase();
-        if (! name || form.latitude.value) {
-            return;
-        }
-        const match = knownCompanies.find((company) => company.name.toLowerCase() === name);
-        if (match) {
-            selectCompany(match);
+    function prepareLocationStep() {
+        ensureCheckinMap();
+        const lat = form.querySelector('[name="latitude"]').value;
+        const lng = form.querySelector('[name="longitude"]').value;
+        const hasPin = lat && lng;
+
+        if (hasPin) {
+            setPin(Number(lng), Number(lat), { reverse: false, fly: true });
+            if (locationBanner) {
+                locationBanner.hidden = false;
+                root.querySelector('#location-banner-title').textContent = selectedCompany?.has_location
+                    ? 'Company location found'
+                    : 'Location ready';
+                root.querySelector('#location-banner-copy').textContent = selectedCompany?.location
+                    || [form.city.value, form.region.value, form.country.value].filter(Boolean).join(', ')
+                    || 'Looks good — adjust anytime on the map.';
+            }
+            if (locationHelp) {
+                locationHelp.textContent = 'Confirm this pin, or move it. New companies can tap anywhere in Malaysia.';
+            }
+        } else {
+            if (locationBanner) locationBanner.hidden = true;
+            if (locationHelp) {
+                locationHelp.textContent = 'No saved pin for this company — search a place or tap the map. Totally fine.';
+            }
         }
     }
 
     function ensureCheckinMap() {
         if (checkinMap) {
             checkinMap.resize();
+            syncPinPreview();
             return;
         }
-
         if (! maplibregl) {
-            showError('Map is unavailable. Enter city/region/country and skip pin placement if needed.');
+            showError('Map is taking a break — enter a city if you can, or try again in a moment.');
             return;
         }
 
-        // Flat map for accurate pin tapping — globe stays on the big booth display.
         checkinMap = new maplibregl.Map({
             container: 'checkin-map',
             style: root.dataset.mapStyle,
@@ -250,52 +374,51 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         });
 
         checkinMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-
         checkinMap.on('style.load', () => {
-            try {
-                checkinMap.setProjection({ type: 'mercator' });
-            } catch (_) {
-                // Older builds without projection API can ignore this.
-            }
+            try { checkinMap.setProjection({ type: 'mercator' }); } catch (_) {}
         });
-
         checkinMap.on('click', (event) => {
+            if (locationBanner) locationBanner.hidden = true;
             setPin(event.lngLat.lng, event.lngLat.lat, { reverse: true, fly: false });
         });
+        checkinMap.on('load', () => {
+            const lat = form.querySelector('[name="latitude"]').value;
+            const lng = form.querySelector('[name="longitude"]').value;
+            if (lat && lng) setPin(Number(lng), Number(lat), { reverse: false, fly: true });
+            syncPinPreview();
+        });
+    }
+
+    function currentAvatarSrc() {
+        if (uploadedObjectUrl) return uploadedObjectUrl;
+        return avatarUrl(avatarSeedInput.value || form.full_name?.value || 'friend', 96);
+    }
+
+    function syncPinPreview() {
+        if (! pinMarker) return;
+        const img = pinMarker.getElement().querySelector('img');
+        if (img) img.src = currentAvatarSrc();
     }
 
     function setPin(lng, lat, { reverse = false, fly = true } = {}) {
         const longitude = Number(lng);
         const latitude = Number(lat);
-        if (! Number.isFinite(longitude) || ! Number.isFinite(latitude)) {
-            return;
-        }
+        if (! Number.isFinite(longitude) || ! Number.isFinite(latitude)) return;
 
         form.querySelector('[name="longitude"]').value = longitude.toFixed(7);
         form.querySelector('[name="latitude"]').value = latitude.toFixed(7);
-
-        if (! maplibregl || ! checkinMap) {
-            return;
-        }
+        if (! maplibregl || ! checkinMap) return;
 
         if (! pinMarker) {
-            const seed = form.company_name?.value || form.full_name?.value || 'friend';
             const el = document.createElement('div');
             el.className = 'avatar-marker avatar-marker--pop';
             el.innerHTML = `
-                <span class="avatar-marker-inner">
-                    <span class="avatar-marker-face">
-                        <img src="${avatarUrl(seed, 96)}" alt="" width="46" height="46">
-                    </span>
+                <span class="avatar-marker-face">
+                    <img src="${currentAvatarSrc()}" alt="" width="46" height="46">
                 </span>
+                <span class="avatar-marker-tip" aria-hidden="true"></span>
             `;
-            pinMarker = new maplibregl.Marker({
-                element: el,
-                anchor: 'bottom',
-                draggable: true,
-                pitchAlignment: 'viewport',
-                rotationAlignment: 'viewport',
-            })
+            pinMarker = new maplibregl.Marker({ element: el, anchor: 'bottom', draggable: true })
                 .setLngLat([longitude, latitude])
                 .addTo(checkinMap);
 
@@ -306,11 +429,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
                 reverseGeocode(pos.lng, pos.lat);
             });
         } else {
-            const seed = form.company_name?.value || form.full_name?.value || 'friend';
-            const img = pinMarker.getElement().querySelector('img');
-            if (img) {
-                img.src = avatarUrl(seed, 96);
-            }
+            syncPinPreview();
             pinMarker.setLngLat([longitude, latitude]);
         }
 
@@ -321,10 +440,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
                 duration: 700,
             });
         }
-
-        if (reverse) {
-            reverseGeocode(longitude, latitude);
-        }
+        if (reverse) reverseGeocode(longitude, latitude);
     }
 
     function reverseGeocode(lng, lat) {
@@ -332,149 +448,96 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         reverseTimer = setTimeout(async () => {
             try {
                 const data = await window.expoFetch(`/api/geocode/reverse?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`);
-                if (! data.result) {
-                    return;
-                }
-                applyLocationFields(data.result, { keepPin: true });
-            } catch (_) {
-                // Pin is already saved even if reverse lookup fails.
-            }
+                if (data.result) applyLocationFields(data.result);
+            } catch (_) {}
         }, 220);
     }
 
     async function searchLocation() {
         const q = root.querySelector('#location-query').value.trim();
         if (q.length < 2) {
-            showError('Search a company or place, or tap the map.');
+            showError('Search a place, or just tap the map — either works.');
             return;
         }
-
         hideError();
         locationResults.innerHTML = '<li><small>Searching…</small></li>';
-
-        const companyMatches = knownCompanies
-            .filter((company) => company.name.toLowerCase().includes(q.toLowerCase()))
-            .slice(0, 4)
-            .map((company) => ({
-                type: 'company',
-                label: company.name,
-                company,
-            }));
-
         try {
             const data = await window.expoFetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-            const placeMatches = (data.results || []).map((result) => ({
-                type: 'place',
-                label: result.label,
-                result,
-            }));
-
-            const rows = [...companyMatches, ...placeMatches];
+            const rows = data.results || [];
             if (! rows.length) {
-                locationResults.innerHTML = '<li><small>No matches. Tap the map to place your avatar.</small></li>';
+                locationResults.innerHTML = '<li><small>No matches — tap the map to place your avatar.</small></li>';
                 return;
             }
-
-            locationResults.innerHTML = rows.map((row, index) => `
+            locationResults.innerHTML = rows.map((result, index) => `
                 <li>
                     <button type="button" data-result-index="${index}">
-                        <strong>${escapeHtml(row.type === 'company' ? row.company.name : 'Place')}</strong>
-                        <small>${escapeHtml(row.type === 'company' ? (row.company.location || 'On the map') : row.label)}</small>
+                        <strong>Place</strong>
+                        <small>${escapeHtml(result.label)}</small>
                     </button>
                 </li>
             `).join('');
-
             locationResults.querySelectorAll('button').forEach((button) => {
                 button.addEventListener('click', () => {
-                    const row = rows[Number(button.dataset.resultIndex)];
-                    if (row.type === 'company') {
-                        selectCompany(row.company);
-                        locationResults.innerHTML = `<li><small>Pinned to ${escapeHtml(row.company.name)}</small></li>`;
-                        return;
-                    }
-                    applyLocation(row.result);
+                    const result = rows[Number(button.dataset.resultIndex)];
+                    applyLocationFields(result);
+                    setPin(result.longitude, result.latitude, { reverse: false, fly: true });
+                    if (locationBanner) locationBanner.hidden = true;
+                    locationResults.innerHTML = `<li><small>Pin set: ${escapeHtml(result.label)}</small></li>`;
                 });
             });
         } catch (error) {
-            if (companyMatches.length) {
-                locationResults.innerHTML = companyMatches.map((row, index) => `
-                    <li>
-                        <button type="button" data-company-only="${index}">
-                            <strong>${escapeHtml(row.company.name)}</strong>
-                            <small>${escapeHtml(row.company.location || 'On the map')}</small>
-                        </button>
-                    </li>
-                `).join('');
-                locationResults.querySelectorAll('[data-company-only]').forEach((button) => {
-                    button.addEventListener('click', () => {
-                        selectCompany(companyMatches[Number(button.dataset.companyOnly)].company);
-                    });
-                });
-                return;
-            }
             locationResults.innerHTML = '';
-            showError(error.message || 'Location search failed. Tap the map to place your avatar.');
+            showError('Place search is quiet — tap the map instead. You’ve got this.');
         }
     }
 
-    function applyLocation(result) {
-        applyLocationFields(result, { keepPin: false });
-        setPin(result.longitude, result.latitude, { reverse: false, fly: true });
-        locationResults.innerHTML = `<li><small>Pin set: ${escapeHtml(result.label)}</small></li>`;
-    }
-
-    function applyLocationFields(result, { keepPin = false } = {}) {
+    function applyLocationFields(result) {
         form.querySelector('[name="city"]').value = result.city || form.querySelector('[name="city"]').value || '';
         form.querySelector('[name="region"]').value = result.region || form.querySelector('[name="region"]').value || '';
         form.querySelector('[name="country"]').value = result.country || form.querySelector('[name="country"]').value || 'Malaysia';
         form.querySelector('[name="address_text"]').value = result.address_text || result.label || '';
-        if (! keepPin && result.longitude != null && result.latitude != null) {
-            // Caller may place the pin separately.
-        }
     }
 
     function validateStep(current) {
         if (current === 1) {
-            const fullName = form.full_name.value.trim();
-            const company = form.company_name.value.trim();
-            const email = form.email.value.trim();
-            const phone = form.phone.value.trim();
-            if (!fullName || !company) {
-                showError('Please enter your name and company.');
+            if (! form.full_name.value.trim()) {
+                showError('What should we call you?');
                 return false;
             }
-            if (!email && !phone) {
-                showError('Provide an email or phone number.');
+            if (! form.email.value.trim() && ! form.phone.value.trim()) {
+                showError('Email or phone is enough — either one is fine.');
                 return false;
             }
             return true;
         }
-
         if (current === 2) {
-            const selected = form.querySelectorAll('input[name="services[]"]:checked');
-            if (!selected.length) {
-                showError('Select at least one interest.');
+            if (! form.company_name.value.trim()) {
+                showError('Add a company name — listed or typed yourself.');
                 return false;
             }
             return true;
         }
-
         if (current === 3) {
-            if (!form.latitude.value || !form.longitude.value) {
-                showError('Search for a company/place or tap the map to place your avatar.');
+            if (! form.querySelectorAll('input[name="services[]"]:checked').length) {
+                showError('Pick at least one interest — any is fine.');
                 return false;
             }
             return true;
         }
-
         if (current === 4) {
-            if (!form.privacy_accepted.checked) {
-                showError('Please confirm the privacy notice.');
+            if (! form.latitude.value || ! form.longitude.value) {
+                showError('Tap the map or search a place so we know where to put you.');
                 return false;
             }
             return true;
         }
-
+        if (current === 5) {
+            if (! form.privacy_accepted.checked) {
+                showError('A quick privacy tick keeps everyone comfortable.');
+                return false;
+            }
+            return true;
+        }
         return true;
     }
 
@@ -482,51 +545,52 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         if (submitting) return;
         submitting = true;
         nextBtn.disabled = true;
-        nextBtn.textContent = 'Submitting…';
+        nextBtn.textContent = 'Joining…';
 
-        const serviceIds = [...form.querySelectorAll('input[name="services[]"]:checked')].map((el) => Number(el.value));
-
-        const payload = {
-            full_name: form.full_name.value.trim(),
-            job_title: form.job_title.value.trim() || null,
-            email: form.email.value.trim() || null,
-            phone: form.phone.value.trim() || null,
-            company_name: form.company_name.value.trim(),
-            address_text: form.address_text.value.trim() || null,
-            city: form.city.value.trim() || null,
-            region: form.region.value.trim() || null,
-            country: form.country.value.trim() || null,
-            latitude: Number(form.latitude.value),
-            longitude: Number(form.longitude.value),
-            public_website: form.public_website.value.trim() || null,
-            display_message: form.display_message?.value.trim() || null,
-            public_display_enabled: form.public_display_enabled.checked,
-            follow_up_consent: form.follow_up_consent.checked,
-            privacy_accepted: form.privacy_accepted.checked,
-            services: serviceIds,
-        };
+        const serviceIds = [...form.querySelectorAll('input[name="services[]"]:checked')].map((el) => el.value);
+        const body = new FormData();
+        body.append('full_name', form.full_name.value.trim());
+        body.append('job_title', form.job_title.value.trim());
+        body.append('email', form.email.value.trim());
+        body.append('phone', form.phone.value.trim());
+        body.append('company_name', form.company_name.value.trim());
+        body.append('address_text', form.address_text.value.trim());
+        body.append('city', form.city.value.trim());
+        body.append('region', form.region.value.trim());
+        body.append('country', form.country.value.trim() || 'Malaysia');
+        body.append('latitude', form.latitude.value);
+        body.append('longitude', form.longitude.value);
+        body.append('public_website', form.public_website.value.trim());
+        body.append('display_message', form.display_message?.value.trim() || '');
+        body.append('public_display_enabled', form.public_display_enabled.checked ? '1' : '0');
+        body.append('follow_up_consent', form.follow_up_consent.checked ? '1' : '0');
+        body.append('privacy_accepted', form.privacy_accepted.checked ? '1' : '0');
+        body.append('services', serviceIds.join(','));
+        if (uploadedFile) {
+            body.append('avatar', uploadedFile);
+        } else {
+            body.append('avatar_seed', avatarSeedInput.value || form.full_name.value.trim() || 'friend');
+        }
 
         try {
             const result = await window.expoFetch('/api/check-in', {
                 method: 'POST',
-                body: JSON.stringify(payload),
+                body,
             });
 
-            const successTitle = root.querySelector('#success-title');
-            const successCopy = root.querySelector('#success-copy');
             const successAvatar = root.querySelector('#success-avatar');
             if (successAvatar) {
-                const seed = result.company?.properties?.name || form.full_name.value || 'friend';
-                successAvatar.src = avatarUrl(seed, 160);
-                successAvatar.alt = seed;
+                successAvatar.src = result.avatar_url
+                    || result.company?.properties?.avatar_url
+                    || currentAvatarSrc();
             }
 
-            successTitle.textContent = 'Looking good!';
-            successCopy.textContent = result.public_display_enabled
-                ? 'Your people avatar is popping onto the Malaysia globe.'
-                : 'You’re checked in. Your company stays private — still glad you came!';
+            root.querySelector('#success-title').textContent = 'Looking good!';
+            root.querySelector('#success-copy').textContent = result.public_display_enabled
+                ? 'Your avatar is popping onto the Malaysia map.'
+                : 'You’re checked in privately — still glad you came!';
 
-            goTo(5);
+            goTo(6);
             await onSuccess?.(result);
         } catch (error) {
             const messages = error.payload?.errors
@@ -534,7 +598,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
                 : error.message;
             showError(messages || 'That didn’t go through — try once more.');
             nextBtn.disabled = false;
-            nextBtn.textContent = stepCopy[4].next;
+            nextBtn.textContent = stepCopy[5].next;
             submitting = false;
         }
     }

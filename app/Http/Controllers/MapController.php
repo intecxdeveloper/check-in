@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\Service;
 use App\Models\Visitor;
+use App\Support\AvatarPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -55,8 +56,10 @@ class MapController extends Controller
         }
 
         $companies = $query->latest('updated_at')->get();
+        $companyIds = $companies->pluck('id');
+
         $latestMessages = Visitor::query()
-            ->whereIn('company_id', $companies->pluck('id'))
+            ->whereIn('company_id', $companyIds)
             ->whereNotNull('display_message')
             ->where('display_message', '!=', '')
             ->latest('id')
@@ -64,8 +67,21 @@ class MapController extends Controller
             ->unique('company_id')
             ->keyBy('company_id');
 
-        $features = $companies->map(function (Company $company) use ($latestMessages) {
+        $latestAvatars = Visitor::query()
+            ->whereIn('company_id', $companyIds)
+            ->where(function ($q) {
+                $q->whereNotNull('avatar_path')->orWhereNotNull('avatar_seed');
+            })
+            ->latest('id')
+            ->get(['company_id', 'avatar_path', 'avatar_seed'])
+            ->unique('company_id')
+            ->keyBy('company_id');
+
+        $features = $companies->map(function (Company $company) use ($latestMessages, $latestAvatars) {
             $company->latest_public_message = $latestMessages->get($company->id)?->display_message ?? '';
+            $avatar = $latestAvatars->get($company->id);
+            $company->map_avatar_path = $avatar?->avatar_path ?: $company->avatar_path;
+            $company->map_avatar_seed = $avatar?->avatar_seed ?: $company->avatar_seed ?: $company->name;
 
             return $company->toPublicMapFeature();
         })->values();
@@ -118,6 +134,11 @@ class MapController extends Controller
                     'company' => $company?->name,
                     'location' => $company?->locationLabel(),
                     'message' => $visitor->display_message,
+                    'avatar_url' => AvatarPresenter::url(
+                        $visitor->avatar_path,
+                        $visitor->avatar_seed,
+                        $company?->name ?: ($firstName ?: 'friend')
+                    ),
                     'public' => (bool) $company?->public_display_enabled,
                     'latitude' => $company?->latitude,
                     'longitude' => $company?->longitude,
