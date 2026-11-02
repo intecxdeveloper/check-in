@@ -49,5 +49,5 @@ See `config/expo.php` and `.env`:
 2. `composer install --no-dev --optimize-autoloader && npm ci && npm run build` (delete `public/hot` if present).
 3. `php artisan key:generate && php artisan migrate --force && php artisan db:seed --force` (in production the seeder only creates services; demo `@expo.test` accounts are local-only and blocked from login in production).
 4. Create staff logins: `php artisan expo:staff you@company.com --name="Your Name"` (prompts for a 12+ character password).
-5. `php artisan storage:link`, then `php artisan config:cache route:cache view:cache event:cache` (run each `*:cache` command).
+5. `php artisan storage:link`, then `php artisan config:cache`, `php artisan route:cache`, `php artisan view:cache`, `php artisan event:cache`.
 6. Serve over HTTPS; health check at `/up`. Back up `database/database.sqlite` and `storage/app/public/avatars` regularly.
