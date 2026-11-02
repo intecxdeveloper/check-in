@@ -20,6 +20,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     const locationHelp = root.querySelector('#location-help');
 
     let step = 1;
+    let stepHasRendered = false;
     let checkinMap = null;
     let pinMarker = null;
     let submitting = false;
@@ -39,12 +40,48 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     setPresetAvatar(selectedPreset);
 
     root.querySelector('#checkin-close')?.addEventListener('click', close);
-    root.querySelector('#location-search-btn')?.addEventListener('click', searchLocation);
-    root.querySelector('#location-query')?.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            searchLocation();
+    const locationQuery = root.querySelector('#location-query');
+    const locationStatus = root.querySelector('#location-status');
+    let locationTimer = null;
+    let locationAbort = null;
+    let locationRows = [];
+    let locationActive = -1;
+    let lastLocationQuery = '';
+
+    root.querySelector('#location-search')?.addEventListener('submit', (event) => event.preventDefault());
+    root.querySelector('#location-search-btn')?.addEventListener('click', () => searchLocation({ force: true }));
+    locationQuery?.addEventListener('input', () => {
+        clearTimeout(locationTimer);
+        const q = locationQuery.value.trim();
+        if (q.length < 3) {
+            locationAbort?.abort();
+            renderLocationRows([]);
+            setLocationStatus(q.length ? 'Keep typing — 3 letters is enough.' : '');
+            return;
         }
+        locationTimer = setTimeout(() => searchLocation(), 450);
+    });
+    locationQuery?.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            if (! locationRows.length) return;
+            event.preventDefault();
+            const delta = event.key === 'ArrowDown' ? 1 : -1;
+            setLocationActive((locationActive + delta + locationRows.length) % locationRows.length);
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            if (locationActive >= 0 && locationRows[locationActive]) {
+                pickLocation(locationActive);
+            } else {
+                clearTimeout(locationTimer);
+                searchLocation({ force: true });
+            }
+        } else if (event.key === 'Escape') {
+            renderLocationRows([]);
+        }
+    });
+    locationResults?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-result-index]');
+        if (button) pickLocation(Number(button.dataset.resultIndex));
     });
     root.querySelector('#location-adjust-btn')?.addEventListener('click', () => {
         locationBanner.hidden = true;
@@ -135,6 +172,8 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     function resetForm() {
         form.reset();
         locationResults.innerHTML = '';
+        locationResults.hidden = true;
+        if (locationStatus) locationStatus.hidden = true;
         if (companyResults) {
             companyResults.innerHTML = '';
             companyResults.hidden = true;
@@ -177,10 +216,10 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         interestOptions.innerHTML = list.map((service) => {
             const color = escapeHtml(service.color || '#007aff');
             return `
-                <div class="interest-chip" style="--interest-color:${color};display:flex;align-items:center;gap:0.65rem;min-height:54px;padding:0.85rem 0.95rem;margin:0;border-radius:1rem;border:1.5px solid rgba(0,0,0,.12);background:#f5f5f7;color:#1d1d1f;font-weight:700;font-size:1rem;">
-                    <input type="checkbox" name="services[]" value="${escapeHtml(String(service.id))}" style="width:1.2rem;height:1.2rem;flex:none;margin:0;">
-                    <span class="interest-option-swatch" aria-hidden="true" style="width:.7rem;height:.7rem;border-radius:999px;background:${color};flex:none;"></span>
-                    <span class="interest-option-label" style="color:#1d1d1f;font-weight:700;">${escapeHtml(service.name)}</span>
+                <div class="interest-chip" style="--interest-color:${color}">
+                    <input type="checkbox" name="services[]" value="${escapeHtml(String(service.id))}" aria-label="${escapeHtml(service.name)}">
+                    <span class="interest-option-swatch" aria-hidden="true"></span>
+                    <span class="interest-option-label">${escapeHtml(service.name)}</span>
                 </div>
             `;
         }).join('');
@@ -266,11 +305,11 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     }
 
     const stepCopy = {
-        1: { label: '1 of 5', title: 'Your look', next: 'Continue' },
-        2: { label: '2 of 5', title: 'Your company', next: 'Continue' },
-        3: { label: '3 of 5', title: 'Interests', next: 'Continue' },
-        4: { label: '4 of 5', title: 'Place your pin', next: 'Continue' },
-        5: { label: '5 of 5', title: 'Almost done', next: 'Join the map' },
+        1: { label: 'Step 1 of 5', title: 'About you', next: 'Continue' },
+        2: { label: 'Step 2 of 5', title: 'Your company', next: 'Continue' },
+        3: { label: 'Step 3 of 5', title: 'Your interests', next: 'Continue' },
+        4: { label: 'Step 4 of 5', title: 'Where you’re based', next: 'Continue' },
+        5: { label: 'Step 5 of 5', title: 'Review and join', next: 'Join the map' },
         6: { label: 'Done', title: 'Looking good!', next: 'Back to the map' },
     };
 
@@ -280,14 +319,21 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
             section.classList.toggle('hidden', Number(section.dataset.step) !== step);
         });
         root.querySelectorAll('[data-step-dot]').forEach((dot) => {
-            dot.classList.toggle('active', Number(dot.dataset.stepDot) <= Math.min(step, 5));
+            const n = Number(dot.dataset.stepDot);
+            dot.classList.toggle('active', n <= Math.min(step, 5));
+            dot.classList.toggle('current', n === step);
         });
+        const progress = root.querySelector('.checkin-progress');
+        progress?.setAttribute('aria-valuenow', String(Math.min(step, 5)));
+        root.querySelector('.checkin-sheet')?.setAttribute('data-current-step', String(step));
 
         const copy = stepCopy[step];
         root.querySelector('#checkin-step-label').textContent = copy.label;
-        if (step < 6) {
-            root.querySelector('#checkin-title').textContent = copy.title;
-        }
+        const title = root.querySelector('#checkin-title');
+        if (step < 6) title.textContent = copy.title;
+        else title.textContent = 'You’re checked in';
+        if (stepHasRendered) title.focus({ preventScroll: true });
+        stepHasRendered = true;
 
         backBtn.classList.toggle('hidden', step === 1 || step === 6);
         nextBtn.disabled = false;
@@ -411,12 +457,12 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
                     || 'Looks good — adjust anytime on the map.';
             }
             if (locationHelp) {
-                locationHelp.textContent = 'Confirm this pin, or move it. New companies can tap anywhere in Malaysia.';
+                locationHelp.textContent = 'We found your company’s pin. Confirm it, or search or drag to move it.';
             }
         } else {
             if (locationBanner) locationBanner.hidden = true;
             if (locationHelp) {
-                locationHelp.textContent = 'No saved pin for this company — search a place or tap the map. Totally fine.';
+                locationHelp.textContent = 'Search for your office or area, or tap the map to drop your pin.';
             }
         }
     }
@@ -520,41 +566,92 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         }, 220);
     }
 
-    async function searchLocation() {
-        const q = root.querySelector('#location-query').value.trim();
+    function setLocationStatus(message, tone = '') {
+        if (! locationStatus) return;
+        locationStatus.textContent = message;
+        locationStatus.dataset.tone = tone;
+        locationStatus.hidden = ! message;
+    }
+
+    function setLocationActive(index) {
+        locationActive = index;
+        locationResults.querySelectorAll('[data-result-index]').forEach((el, i) => {
+            const on = i === index;
+            el.setAttribute('aria-selected', on ? 'true' : 'false');
+            if (on) {
+                locationQuery?.setAttribute('aria-activedescendant', el.id);
+                el.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    }
+
+    function renderLocationRows(rows) {
+        locationRows = rows;
+        locationActive = -1;
+        locationQuery?.removeAttribute('aria-activedescendant');
+        locationQuery?.setAttribute('aria-expanded', rows.length ? 'true' : 'false');
+        locationResults.hidden = ! rows.length;
+        locationResults.innerHTML = rows.map((result, index) => {
+            const name = result.name || String(result.label || '').split(',')[0];
+            const rest = String(result.label || '').split(',').slice(1).join(',').trim();
+            return `
+                <li role="option" id="location-option-${index}" data-result-index="${index}" aria-selected="false" tabindex="-1">
+                    <span class="location-option-icon" aria-hidden="true"></span>
+                    <span class="location-option-text">
+                        <strong>${escapeHtml(name)}</strong>
+                        ${rest ? `<small>${escapeHtml(rest)}</small>` : ''}
+                    </span>
+                </li>`;
+        }).join('');
+    }
+
+    function pickLocation(index) {
+        const result = locationRows[index];
+        if (! result) return;
+        applyLocationFields(result);
+        setPin(result.longitude, result.latitude, { reverse: false, fly: false });
+        checkinMap?.easeTo({ center: [Number(result.longitude), Number(result.latitude)], zoom: 15, duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 700 });
+        if (locationBanner) locationBanner.hidden = true;
+        renderLocationRows([]);
+        if (locationQuery) locationQuery.value = result.name || String(result.label || '').split(',')[0];
+        setLocationStatus(`Pin placed at ${result.label}. Drag your avatar to fine-tune.`, 'ok');
+        hideError();
+        checkinMap?.getContainer().scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    async function searchLocation({ force = false } = {}) {
+        const q = locationQuery?.value.trim() || '';
         if (q.length < 2) {
-            showError('Search a place, or just tap the map — either works.');
+            setLocationStatus('Type a place, area or address — or tap the map.', 'warn');
+            locationQuery?.focus();
             return;
         }
-        hideError();
-        locationResults.innerHTML = '<li><small>Searching…</small></li>';
+        if (! force && q === lastLocationQuery && locationRows.length) return;
+        lastLocationQuery = q;
+
+        locationAbort?.abort();
+        locationAbort = new AbortController();
+        const { signal } = locationAbort;
+        const wrap = root.querySelector('#location-search');
+        wrap?.setAttribute('aria-busy', 'true');
+        setLocationStatus('Searching Malaysia…', 'busy');
+
         try {
-            const data = await window.expoFetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-            const rows = data.results || [];
-            if (! rows.length) {
-                locationResults.innerHTML = '<li><small>No matches — tap the map to place your avatar.</small></li>';
-                return;
-            }
-            locationResults.innerHTML = rows.map((result, index) => `
-                <li>
-                    <button type="button" data-result-index="${index}">
-                        <strong>Place</strong>
-                        <small>${escapeHtml(result.label)}</small>
-                    </button>
-                </li>
-            `).join('');
-            locationResults.querySelectorAll('button').forEach((button) => {
-                button.addEventListener('click', () => {
-                    const result = rows[Number(button.dataset.resultIndex)];
-                    applyLocationFields(result);
-                    setPin(result.longitude, result.latitude, { reverse: false, fly: true });
-                    if (locationBanner) locationBanner.hidden = true;
-                    locationResults.innerHTML = `<li><small>Pin set: ${escapeHtml(result.label)}</small></li>`;
-                });
-            });
+            const data = await window.expoFetch(`/api/geocode?q=${encodeURIComponent(q)}`, { signal });
+            if (signal.aborted) return;
+            const rows = (data.results || []).filter((row) => Number.isFinite(Number(row.latitude)) && Number.isFinite(Number(row.longitude)));
+            renderLocationRows(rows);
+            setLocationStatus(rows.length
+                ? `${rows.length} ${rows.length === 1 ? 'place' : 'places'} found — tap one to drop your pin.`
+                : `No places match “${q}”. Try a city or area name, or tap the map.`, rows.length ? '' : 'warn');
         } catch (error) {
-            locationResults.innerHTML = '';
-            showError('Place search is quiet — tap the map instead. You’ve got this.');
+            if (signal.aborted || error?.name === 'AbortError') return;
+            renderLocationRows([]);
+            // Keep what they typed so the address still reaches staff.
+            form.querySelector('[name="address_text"]').value = q;
+            setLocationStatus('Place search is unavailable right now. Tap the map or drag your avatar to your area — we’ll keep the address you typed.', 'error');
+        } finally {
+            if (! signal.aborted) wrap?.removeAttribute('aria-busy');
         }
     }
 
@@ -568,39 +665,43 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
     function validateStep(current) {
         if (current === 1) {
             if (! form.full_name.value.trim()) {
-                showError('What should we call you?');
+                showError('Add your name so the booth team can greet you.', form.full_name);
                 return false;
             }
             if (! form.email.value.trim() && ! form.phone.value.trim()) {
-                showError('Email or phone is enough — either one is fine.');
+                showError('Add an email or a phone number — one is enough.', [form.email, form.phone]);
+                return false;
+            }
+            if (form.email.value.trim() && ! form.email.checkValidity()) {
+                showError('That email looks incomplete — check for a typo, e.g. name@company.my.', form.email);
                 return false;
             }
             return true;
         }
         if (current === 2) {
             if (! form.company_name.value.trim()) {
-                showError('Add a company name — listed or typed yourself.');
+                showError('Add your company — pick one from the list or type it in.', form.company_name);
                 return false;
             }
             return true;
         }
         if (current === 3) {
             if (! form.querySelectorAll('input[name="services[]"]:checked').length) {
-                showError('Pick at least one interest — any is fine.');
+                showError('Choose at least one topic you’d like to hear about.');
                 return false;
             }
             return true;
         }
         if (current === 4) {
             if (! form.latitude.value || ! form.longitude.value) {
-                showError('Tap the map or search a place so we know where to put you.');
+                showError('Search for a place or tap the map to drop your pin.', locationQuery);
                 return false;
             }
             return true;
         }
         if (current === 5) {
             if (! form.privacy_accepted.checked) {
-                showError('A quick privacy tick keeps everyone comfortable.');
+                showError('Please confirm you’ve read the privacy note to continue.', form.privacy_accepted);
                 return false;
             }
             return true;
@@ -670,15 +771,42 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         }
     }
 
-    function showError(message) {
+    function showError(message, field = null) {
         errorEl.textContent = message;
         errorEl.classList.remove('hidden');
+        form.querySelectorAll('[aria-invalid="true"]').forEach((el) => el.removeAttribute('aria-invalid'));
+        const fields = (Array.isArray(field) ? field : [field]).filter(Boolean);
+        fields.forEach((el) => {
+            el.setAttribute('aria-invalid', 'true');
+            el.setAttribute('aria-describedby', 'checkin-error');
+        });
+        if (fields[0]) {
+            fields[0].focus({ preventScroll: true });
+            fields[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } else {
+            errorEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
     }
 
     function hideError() {
         errorEl.classList.add('hidden');
         errorEl.textContent = '';
+        form.querySelectorAll('[aria-invalid="true"]').forEach((el) => el.removeAttribute('aria-invalid'));
     }
+
+    form.addEventListener('input', (event) => {
+        if (event.target.getAttribute?.('aria-invalid') === 'true') {
+            event.target.removeAttribute('aria-invalid');
+            if (! form.querySelector('[aria-invalid="true"]')) hideError();
+        }
+    });
+
+    // Keep the focused field visible above the on-screen keyboard.
+    form.addEventListener('focusin', (event) => {
+        const el = event.target;
+        if (! el.matches?.('input[type="text"], input[type="email"], input[type="tel"], input[type="url"], input[type="search"]')) return;
+        setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 260);
+    });
 
     return { open, close };
 }
