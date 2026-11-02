@@ -38,4 +38,12 @@ class Visitor extends Model
     {
         return $this->hasOne(Lead::class);
     }
+
+    /**
+     * Short counter code staff can match on the visitor's phone receipt.
+     */
+    public function claimCode(): string
+    {
+        return 'CK-'.str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+    }
 }

@@ -49,10 +49,11 @@
                         · <time datetime="{{ $visitor->created_at?->toIso8601String() }}">{{ $visitor->created_at?->diffForHumans() }}</time>
                     </p>
                     <dl class="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                        <div><dt class="text-xs font-semibold text-mute">Claim code</dt><dd class="font-mono font-bold tracking-wide">{{ $visitor->claimCode() }}</dd></div>
+                        <div><dt class="text-xs font-semibold text-mute">Consent</dt><dd>{{ $visitor->company?->public_display_enabled ? 'Shown on map' : 'Hidden from map' }} · {{ $visitor->follow_up_consent_at ? 'Follow-up OK' : 'No follow-up' }}</dd></div>
                         <div><dt class="text-xs font-semibold text-mute">Email</dt><dd class="break-all">@if ($visitor->email)<a class="hover:underline" href="mailto:{{ $visitor->email }}">{{ $visitor->email }}</a>@else — @endif</dd></div>
                         <div><dt class="text-xs font-semibold text-mute">Phone</dt><dd>@if ($visitor->phone)<a class="hover:underline" href="tel:{{ preg_replace('/[^0-9+]/', '', $visitor->phone) }}">{{ $visitor->phone }}</a>@else — @endif</dd></div>
                         <div><dt class="text-xs font-semibold text-mute">Location</dt><dd>{{ $visitor->company?->locationLabel() ?: '—' }}</dd></div>
-                        <div><dt class="text-xs font-semibold text-mute">Consent</dt><dd>{{ $visitor->company?->public_display_enabled ? 'Shown on map' : 'Hidden from map' }} · {{ $visitor->follow_up_consent_at ? 'Follow-up OK' : 'No follow-up' }}</dd></div>
                     </dl>
                     @if (($visitor->company?->services ?? collect())->isNotEmpty())
                         <ul class="mt-3 flex flex-wrap gap-1.5" aria-label="Interests">

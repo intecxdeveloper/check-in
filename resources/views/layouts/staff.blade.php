@@ -5,16 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#ffffff">
-    <title>@yield('title', 'Staff') · Expo Check-in</title>
+    <title>@yield('title', 'Staff') · {{ config('expo.brand_name') }}</title>
+    <link rel="icon" href="{{ asset(config('expo.brand_mark')) }}" type="image/png">
     @vite(['resources/css/app.css'])
 </head>
 <body class="staff-body min-h-screen antialiased">
     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:shadow">Skip to content</a>
     <header class="sticky top-0 z-20 border-b border-black/[0.06] bg-white/90 backdrop-blur">
         <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-            <a href="{{ route('staff.dashboard') }}" class="flex items-baseline gap-2">
-                <span class="text-[0.95rem] font-bold tracking-tight">Visitor Desk</span>
-                <span class="text-xs font-semibold text-mute">Staff</span>
+            <a href="{{ route('staff.dashboard') }}" class="flex items-center gap-2.5">
+                <img
+                    src="{{ asset(config('expo.brand_mark')) }}"
+                    alt="{{ config('expo.brand_name') }}"
+                    class="h-7 w-auto"
+                    width="128"
+                    height="44"
+                    decoding="async"
+                >
+                <span class="text-xs font-semibold text-mute">Visitor Desk</span>
             </a>
             @auth
                 <nav class="staff-nav -mx-1 flex items-center gap-1 overflow-x-auto text-sm font-semibold" aria-label="Staff">

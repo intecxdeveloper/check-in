@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'brand_name' => env('EXPO_BRAND_NAME', 'NADI Spatial'),
+    'brand_logo' => 'images/nadi-spatial-logo.png',
+    'brand_mark' => 'images/nadi-spatial-mark.png',
+
     'privacy_notice_version' => env('EXPO_PRIVACY_VERSION', '1.0'),
     'geocoder_user_agent' => env(
         'EXPO_GEOCODER_USER_AGENT',

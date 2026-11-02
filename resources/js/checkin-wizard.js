@@ -145,6 +145,9 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
             await submit();
             return;
         }
+        if (hasPrizeReceipt()) {
+            return;
+        }
         if (lockOpen) {
             nextBtn.textContent = 'Done — look at the big screen';
             return;
@@ -313,6 +316,10 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         6: { label: 'Done', title: 'Looking good!', next: 'Back to the map' },
     };
 
+    function hasPrizeReceipt() {
+        return Boolean(root.querySelector('#prize-receipt'));
+    }
+
     function goTo(nextStep) {
         step = nextStep;
         form.querySelectorAll('[data-step]').forEach((section) => {
@@ -330,14 +337,17 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         const copy = stepCopy[step];
         root.querySelector('#checkin-step-label').textContent = copy.label;
         const title = root.querySelector('#checkin-title');
-        if (step < 6) title.textContent = copy.title;
-        else title.textContent = 'You’re checked in';
+        title.textContent = step < 6 ? copy.title : 'You’re checked in';
         if (stepHasRendered) title.focus({ preventScroll: true });
         stepHasRendered = true;
 
         backBtn.classList.toggle('hidden', step === 1 || step === 6);
         nextBtn.disabled = false;
-        nextBtn.textContent = copy.next;
+        nextBtn.textContent = hasPrizeReceipt() && step === 6
+            ? 'Keep this screen open'
+            : copy.next;
+        nextBtn.classList.toggle('hidden', hasPrizeReceipt() && step === 6);
+        root.querySelector('.checkin-actions')?.classList.toggle('checkin-actions--done', hasPrizeReceipt() && step === 6);
 
         const sheet = root.querySelector('.checkin-sheet');
         if (sheet) {
@@ -753,10 +763,26 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
                     || currentAvatarSrc();
             }
 
-            root.querySelector('#success-title').textContent = 'Looking good!';
-            root.querySelector('#success-copy').textContent = result.public_display_enabled
-                ? 'Your avatar is popping onto the Malaysia map.'
-                : 'You’re checked in privately — still glad you came!';
+            if (hasPrizeReceipt()) {
+                root.querySelector('#success-title').textContent = 'You’re in!';
+                root.querySelector('#success-copy').textContent = 'Keep this receipt open and show it at the counter to claim your prize.';
+                const claimCode = root.querySelector('#prize-claim-code');
+                const claimName = root.querySelector('#prize-claim-name');
+                const claimCompany = root.querySelector('#prize-claim-company');
+                if (claimCode) claimCode.textContent = result.claim_code || 'CK-————';
+                if (claimName) claimName.textContent = result.full_name || form.full_name.value.trim() || '—';
+                if (claimCompany) {
+                    claimCompany.textContent = result.company_name
+                        || result.company?.properties?.name
+                        || form.company_name.value.trim()
+                        || '—';
+                }
+            } else {
+                root.querySelector('#success-title').textContent = 'Looking good!';
+                root.querySelector('#success-copy').textContent = result.public_display_enabled
+                    ? 'Your avatar is popping onto the Malaysia map.'
+                    : 'You’re checked in privately — still glad you came!';
+            }
 
             goTo(6);
             await onSuccess?.(result);

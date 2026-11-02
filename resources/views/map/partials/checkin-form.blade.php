@@ -142,15 +142,29 @@
     </section>
 
     <section data-step="6" class="checkin-step hidden">
-        <div class="success-panel">
+        <div class="success-panel{{ isset($showPrizeReceipt) ? ' success-panel--receipt' : '' }}">
             <div class="success-badge" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
             <img id="success-avatar" class="success-avatar-img" alt="" width="96" height="96">
-                        <h3 id="success-title">Looking good!</h3>
+            <h3 id="success-title">Looking good!</h3>
             <p id="success-copy">Look up at the booth screen — your avatar should appear in a few seconds.</p>
-            @isset($showMapLink)
-                <a class="btn-primary success-map-link" href="{{ route('map') }}">See the live map</a>
+            @isset($showPrizeReceipt)
+                <div class="prize-receipt" id="prize-receipt" aria-label="Prize claim receipt">
+                    <p class="prize-receipt-eyebrow">Prize claim receipt</p>
+                    <p class="prize-receipt-code" id="prize-claim-code">CK-————</p>
+                    <dl class="prize-receipt-meta">
+                        <div>
+                            <dt>Name</dt>
+                            <dd id="prize-claim-name">—</dd>
+                        </div>
+                        <div>
+                            <dt>Company</dt>
+                            <dd id="prize-claim-company">—</dd>
+                        </div>
+                    </dl>
+                    <p class="prize-receipt-cta">Show this screen at the counter to claim your prize.</p>
+                </div>
             @endisset
         </div>
     </section>

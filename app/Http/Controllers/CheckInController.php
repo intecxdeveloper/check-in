@@ -8,8 +8,8 @@ use App\Models\Lead;
 use App\Models\Visitor;
 use App\Support\AvatarImage;
 use App\Support\AvatarPresenter;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -92,7 +92,10 @@ class CheckInController extends Controller
 
             return [
                 'visitor_id' => $visitor->id,
+                'claim_code' => $visitor->claimCode(),
+                'full_name' => $visitor->full_name,
                 'first_name' => $firstName !== '' ? $firstName : null,
+                'company_name' => $company->name,
                 'display_message' => $visitor->display_message,
                 'avatar_url' => AvatarPresenter::url($visitor->avatar_path, $visitor->avatar_seed, $company->name),
                 'company' => $mapFeature,

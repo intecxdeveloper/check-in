@@ -14,7 +14,16 @@
 
     <div class="expo-overlay pointer-events-none">
         <header class="expo-brand pointer-events-auto">
-            <p class="expo-brand-name">Our World</p>
+            <a class="expo-brand-link" href="{{ route('map') }}" aria-label="{{ config('expo.brand_name') }}">
+                <img
+                    class="expo-brand-logo"
+                    src="{{ asset(config('expo.brand_logo')) }}"
+                    alt="{{ config('expo.brand_name') }}"
+                    width="640"
+                    height="223"
+                    decoding="async"
+                >
+            </a>
         </header>
 
         <aside class="expo-qr pointer-events-auto">
@@ -46,6 +55,7 @@
     </div>
 
     <div id="milestone" class="expo-milestone hidden" role="status"></div>
+    <canvas id="join-fireworks" class="join-fireworks hidden" aria-hidden="true"></canvas>
     <div id="checkin-toast" class="join-toast hidden" role="status" aria-live="assertive"></div>
     <div id="map-fallback" class="map-fallback hidden"></div>
 

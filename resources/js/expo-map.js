@@ -14,6 +14,7 @@ export function createExpoMap(root, maplibregl) {
     let map = null;
     let recentBootstrapped = false;
     let toastTimer = null;
+    let toastLeaveTimer = null;
 
     const statsEls = {
         check_ins: root.querySelector('[data-stat="check_ins"]'),
@@ -26,6 +27,7 @@ export function createExpoMap(root, maplibregl) {
     const companyCard = root.querySelector('#company-card');
     const milestone = root.querySelector('#milestone');
     const toastEl = root.querySelector('#checkin-toast');
+    const fireworksEl = root.querySelector('#join-fireworks');
 
     renderCheckInQr(checkInUrl);
 
@@ -466,6 +468,25 @@ export function createExpoMap(root, maplibregl) {
         }
     }
 
+    function hideJoinCelebration() {
+        clearTimeout(toastTimer);
+        clearTimeout(toastLeaveTimer);
+        stopFireworks(fireworksEl);
+        fireworksEl?.classList.add('hidden');
+
+        if (! toastEl || toastEl.classList.contains('hidden')) {
+            return;
+        }
+
+        toastEl.classList.add('leaving');
+        toastEl.classList.remove('visible');
+        toastLeaveTimer = setTimeout(() => {
+            toastEl.classList.add('hidden');
+            toastEl.classList.remove('leaving');
+            toastEl.innerHTML = '';
+        }, 320);
+    }
+
     function showCheckInToast(item) {
         if (! toastEl) {
             return;
@@ -475,41 +496,44 @@ export function createExpoMap(root, maplibregl) {
         const name = String(item.first_name || item.company || 'A new friend').trim();
         const message = String(item.message || '').trim();
         const location = String(item.location || 'Malaysia').trim();
+        const companyLine = item.company && item.first_name ? item.company : location;
         const imageUrl = resolveAvatarUrl({
             avatarUrl: item.avatar_url,
             seed,
             name: item.company || name,
             size: 120,
         });
+        const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-        stopFireworks(toastEl);
-        toastEl.className = 'join-toast hidden';
+        clearTimeout(toastTimer);
+        clearTimeout(toastLeaveTimer);
+        stopFireworks(fireworksEl);
+
+        toastEl.className = 'join-toast join-toast--celebrate hidden';
         toastEl.innerHTML = `
-            <img class="join-toast-avatar" src="${imageUrl}" alt="" width="52" height="52">
+            <span class="join-toast-sparkles" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+            </span>
+            <img class="join-toast-avatar" src="${imageUrl}" alt="" width="56" height="56">
             <div class="join-toast-copy">
-                <p class="join-toast-kicker">Just joined</p>
-                <strong><span>${escapeHtml(name)}</span> is here!</strong>
+                <p class="join-toast-kicker">Welcome to the map</p>
+                <strong><span>${escapeHtml(name)}</span> just joined!</strong>
                 ${message ? `<p class="join-toast-message">${escapeHtml(message)}</p>` : ''}
-                <small>${escapeHtml(item.company && item.first_name ? item.company : location)}</small>
+                <small>${escapeHtml(companyLine)}</small>
             </div>
         `;
 
         toastEl.classList.remove('hidden');
-        // Restart fly-in animation if another toast is already showing.
         toastEl.classList.remove('visible', 'leaving');
         void toastEl.offsetWidth;
         requestAnimationFrame(() => toastEl.classList.add('visible'));
 
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => {
-            toastEl.classList.add('leaving');
-            toastEl.classList.remove('visible');
-            setTimeout(() => {
-                toastEl.classList.add('hidden');
-                toastEl.classList.remove('leaving');
-                toastEl.innerHTML = '';
-            }, 380);
-        }, 5000);
+        if (fireworksEl && ! reduceMotion) {
+            fireworksEl.classList.remove('hidden');
+            startFireworks(fireworksEl);
+        }
+
+        toastTimer = setTimeout(() => hideJoinCelebration(), 3000);
     }
 
     function openCompanyCard(rawProps) {
@@ -687,8 +711,8 @@ function startFireworks(canvas) {
         }
     };
 
-    // Immediate opening bursts for impact.
-    for (let i = 0; i < 7; i += 1) {
+    // Immediate opening bursts for a short celebration.
+    for (let i = 0; i < 9; i += 1) {
         launch();
     }
 
@@ -698,7 +722,8 @@ function startFireworks(canvas) {
         ctx.clearRect(0, 0, w, h);
         frame += 1;
 
-        if (frame - lastBurst > 10) {
+        // Keep launching for about 2.5s, then let sparks fade out.
+        if (frame < 150 && frame - lastBurst > 8) {
             launch();
             lastBurst = frame;
         }
@@ -767,6 +792,11 @@ function stopFireworks(root) {
     if (canvas._fireworksResize) {
         window.removeEventListener('resize', canvas._fireworksResize);
         canvas._fireworksResize = null;
+    }
+    const ctx = canvas.getContext?.('2d');
+    if (ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 }
 

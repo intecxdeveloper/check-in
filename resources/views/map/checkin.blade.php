@@ -13,13 +13,16 @@
     <div class="checkin-only-bg" aria-hidden="true"></div>
 
     <div class="checkin-only-hero">
-        <div class="expo-brand-avatars" aria-hidden="true">
-            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=boothLead1&backgroundColor=ffd5dc&clothing=blazerAndShirt&clothingColor=25557c&accessoriesProbability=0&facialHairProbability=0&mouth=smile&radius=50" alt="">
-            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=boothLead2&backgroundColor=b6e3f4&clothing=blazerAndSweater&clothingColor=262e33&accessoriesProbability=0&facialHairProbability=10&mouth=smile&radius=50" alt="">
-            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=boothLead3&backgroundColor=c1f4c5&clothing=collarAndSweater&clothingColor=5199e4&accessoriesProbability=0&facialHairProbability=0&mouth=smile&radius=50" alt="">
-        </div>
+        <img
+            class="checkin-brand-logo"
+            src="{{ asset(config('expo.brand_logo')) }}"
+            alt="{{ config('expo.brand_name') }}"
+            width="640"
+            height="223"
+            decoding="async"
+        >
         <h1>Join the Malaysia map</h1>
-        <p>Five quick steps, about a minute. Your avatar appears on the booth screen when you’re done.</p>
+        <p>Five quick steps, about a minute. When you’re done, show your receipt at the counter to claim a prize.</p>
     </div>
 
     <div id="company-card" class="company-card hidden" hidden></div>
@@ -48,7 +51,7 @@
                 <span data-step-dot="5"></span>
             </div>
 
-            @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'showMapLink' => true, 'services' => $services])
+            @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'showPrizeReceipt' => true, 'services' => $services])
         </div>
     </div>
 </div>
