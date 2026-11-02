@@ -21,6 +21,10 @@
             height="223"
             decoding="async"
         >
+        <div class="aiva-greeting">
+            @include('partials.aiva', ['pose' => 'wave', 'size' => 64, 'loading' => 'eager', 'class' => 'aiva-greeting-img'])
+            <p class="aiva-bubble"><strong>Hi, I’m Aiva.</strong> I’ll walk you through it.</p>
+        </div>
         <h1>Join the Malaysia map</h1>
         <p>Five quick steps, about a minute. When you’re done, show your receipt at the counter to claim a prize.</p>
     </div>

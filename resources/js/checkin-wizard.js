@@ -217,7 +217,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         }
 
         interestOptions.innerHTML = list.map((service) => {
-            const color = escapeHtml(service.color || '#007aff');
+            const color = escapeHtml(service.color || '#0058b8');
             return `
                 <div class="interest-chip" style="--interest-color:${color}">
                     <input type="checkbox" name="services[]" value="${escapeHtml(String(service.id))}" aria-label="${escapeHtml(service.name)}">

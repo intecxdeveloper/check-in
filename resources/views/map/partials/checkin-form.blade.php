@@ -58,7 +58,7 @@
         <p class="checkin-help">What are you into? Tap as many as you like — no wrong answers.</p>
         <div id="interest-options" class="interest-grid" role="group" aria-label="Interests">
             @foreach (($services ?? collect()) as $service)
-                <div class="interest-chip" style="--interest-color: {{ $service->color ?: '#007aff' }}">
+                <div class="interest-chip" style="--interest-color: {{ $service->color ?: '#0058b8' }}">
                     <input type="checkbox" name="services[]" value="{{ $service->id }}" aria-label="{{ $service->name }}">
                     <span class="interest-option-swatch" aria-hidden="true"></span>
                     <span class="interest-option-label">{{ $service->name }}</span>
@@ -84,7 +84,10 @@
                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="location-results">
             <button type="button" id="location-search-btn">Search</button>
         </div>
-        <p id="location-status" class="location-status" role="status" aria-live="polite" hidden></p>
+        <div class="location-status-row">
+            @include('partials.aiva', ['pose' => 'work', 'size' => 34, 'class' => 'aiva-status'])
+            <p id="location-status" class="location-status" role="status" aria-live="polite" hidden></p>
+        </div>
         <ul id="location-results" class="location-results" role="listbox" aria-label="Matching places" hidden></ul>
         <div id="checkin-map" class="checkin-map"></div>
         <p class="checkin-help">Can’t find it? Tap the map near your area, then drag your avatar to the exact spot.</p>
@@ -105,6 +108,10 @@
     </section>
 
     <section data-step="5" class="checkin-step hidden">
+        <div class="aiva-note">
+            @include('partials.aiva', ['pose' => 'done', 'size' => 48])
+            <p>Almost done. Here’s what shows publicly and what stays private.</p>
+        </div>
         <div class="consent-card">
             <p><strong>On the map</strong> (if you opt in): company, place, interests, avatar, optional message.</p>
             <p><strong>Always private:</strong> your name, email, phone, and staff notes.</p>
@@ -146,7 +153,10 @@
             <div class="success-badge" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
-            <img id="success-avatar" class="success-avatar-img" alt="" width="96" height="96">
+            <div class="success-figures">
+                <img id="success-avatar" class="success-avatar-img" alt="" width="96" height="96">
+                @include('partials.aiva', ['pose' => 'wave', 'size' => 76, 'class' => 'aiva-success'])
+            </div>
             <h3 id="success-title">Looking good!</h3>
             <p id="success-copy">Look up at the booth screen — your avatar should appear in a few seconds.</p>
             @isset($showPrizeReceipt)
@@ -169,7 +179,10 @@
         </div>
     </section>
 
-    <p id="checkin-error" class="checkin-error hidden" role="alert"></p>
+    <div class="checkin-error-row">
+        @include('partials.aiva', ['pose' => 'idle', 'size' => 30, 'class' => 'aiva-error'])
+        <p id="checkin-error" class="checkin-error hidden" role="alert"></p>
+    </div>
 
     <div class="checkin-actions">
         <button type="button" id="checkin-back" class="btn-secondary hidden">Back</button>

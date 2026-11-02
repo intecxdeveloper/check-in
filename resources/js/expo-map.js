@@ -49,7 +49,7 @@ export function createExpoMap(root, maplibregl) {
                 el.classList.toggle('active', on);
                 if (on) {
                     const service = services.find((item) => item.slug === el.dataset.service);
-                    el.style.background = service?.color || '#007aff';
+                    el.style.background = service?.color || '#0058b8';
                     el.style.color = '#fff';
                 } else {
                     el.style.background = '';
@@ -802,7 +802,7 @@ function stopFireworks(root) {
 
 function chipButton(label, slug, active = false, color = null) {
     const activeClass = active ? 'active' : '';
-    const bg = active ? `style="background:${color || '#007aff'};color:#fff"` : '';
+    const bg = active ? `style="background:${color || '#0058b8'};color:#fff"` : '';
     return `<button type="button" class="expo-chip ${activeClass}" data-service="${slug ?? ''}" ${bg}>${escapeHtml(label)}</button>`;
 }
 

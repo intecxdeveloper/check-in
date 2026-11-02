@@ -5,7 +5,7 @@
 @section('content')
 <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
     <div>
-        <h1 class="text-2xl font-bold tracking-tight">Visitors</h1>
+        <h1 class="font-display text-2xl font-bold tracking-tight text-navy">Visitors</h1>
         <p class="staff-num text-sm text-mute">{{ number_format($visitors->total()) }} {{ \Illuminate\Support\Str::plural('record', $visitors->total()) }}@if ($filters['q'] || $filters['status']) matching your filters @endif</p>
     </div>
     <a href="{{ route('staff.export', request()->query()) }}"
@@ -26,7 +26,7 @@
                 <option value="{{ $status }}" @selected($filters['status'] === $status)>{{ ucfirst($status) }}</option>
             @endforeach
         </select>
-        <button class="min-h-11 rounded-xl bg-ink px-5 text-sm font-semibold text-white">Search</button>
+        <button class="min-h-11 rounded-xl bg-navy px-5 text-sm font-semibold text-white">Search</button>
         @if ($filters['q'] || $filters['status'])
             <a href="{{ route('staff.visitors') }}" class="inline-flex min-h-11 items-center px-2 text-sm font-semibold text-mute hover:text-ink">Clear</a>
         @endif
@@ -92,13 +92,14 @@
                             Private notes
                             <textarea name="staff_notes" rows="2" class="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-base font-normal text-ink sm:text-sm">{{ $visitor->lead->staff_notes }}</textarea>
                         </label>
-                        <button class="min-h-10 w-full rounded-lg bg-ink px-4 text-sm font-semibold text-white sm:w-auto">Save lead</button>
+                        <button class="min-h-10 w-full rounded-lg bg-navy px-4 text-sm font-semibold text-white hover:bg-navy-2 sm:w-auto">Save lead</button>
                     </form>
                 @endif
             </div>
         </article>
     @empty
         <div class="rounded-2xl border border-dashed border-black/15 bg-white px-6 py-12 text-center">
+            @include('partials.aiva', ['pose' => 'idle', 'size' => 64, 'class' => 'mx-auto mb-3'])
             <p class="font-semibold">No visitors found</p>
             <p class="mt-1 text-sm text-mute">@if ($filters['q'] || $filters['status'])Try a different name or status, or <a class="font-semibold text-blue hover:underline" href="{{ route('staff.visitors') }}">clear the filters</a>.@else Check-ins from the booth will show up here. @endif</p>
         </div>

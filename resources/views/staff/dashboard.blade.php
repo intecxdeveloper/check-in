@@ -36,7 +36,7 @@
                     @endif
                 </li>
             @empty
-                <li class="py-10 text-center text-sm text-mute">No check-ins yet. They appear here the moment a visitor submits the form.</li>
+                <li class="py-10 text-center text-sm text-mute">@include('partials.aiva', ['pose' => 'idle', 'size' => 56, 'class' => 'mx-auto mb-3'])No check-ins yet. They appear here the moment a visitor submits the form.</li>
             @endforelse
         </ul>
     </section>
