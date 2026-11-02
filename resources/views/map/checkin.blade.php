@@ -19,7 +19,7 @@
             <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=boothLead3&backgroundColor=c1f4c5&clothing=collarAndSweater&clothingColor=5199e4&accessoriesProbability=0&facialHairProbability=0&mouth=smile&radius=50" alt="">
         </div>
         <h1>Join the Malaysia map</h1>
-        <p>Pick an avatar, find your company, drop a pin — then watch yourself appear on the big screen.</p>
+        <p>Five quick steps, about a minute. Your avatar appears on the booth screen when you’re done.</p>
     </div>
 
     <div id="company-card" class="company-card hidden" hidden></div>
@@ -35,18 +35,17 @@
         <div class="checkin-sheet">
             <div class="checkin-header">
                 <div>
-                    <p class="checkin-eyebrow" id="checkin-step-label">1 of 5</p>
-                    <h2 id="checkin-title">Your look</h2>
+                    <p class="checkin-eyebrow" id="checkin-step-label" aria-live="polite">Step 1 of 5</p>
+                    <h2 id="checkin-title" tabindex="-1">About you</h2>
                 </div>
             </div>
 
-            <div class="checkin-progress" aria-hidden="true">
-                <span data-step-dot="1" class="active"></span>
+            <div class="checkin-progress" role="progressbar" aria-label="Check-in progress" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1">
+                <span data-step-dot="1" class="active current"></span>
                 <span data-step-dot="2"></span>
                 <span data-step-dot="3"></span>
                 <span data-step-dot="4"></span>
                 <span data-step-dot="5"></span>
-                <span data-step-dot="6"></span>
             </div>
 
             @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'showMapLink' => true, 'services' => $services])

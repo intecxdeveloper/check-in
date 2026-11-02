@@ -53,19 +53,18 @@
         <div class="checkin-sheet">
             <div class="checkin-header">
                 <div>
-                    <p class="checkin-eyebrow" id="checkin-step-label">1 of 5</p>
-                    <h2 id="checkin-title">Your look</h2>
+                    <p class="checkin-eyebrow" id="checkin-step-label" aria-live="polite">Step 1 of 5</p>
+                    <h2 id="checkin-title" tabindex="-1">Your look</h2>
                 </div>
                 <button type="button" id="checkin-close" class="checkin-close" aria-label="Close check-in">×</button>
             </div>
 
-            <div class="checkin-progress" aria-hidden="true">
-                <span data-step-dot="1" class="active"></span>
+            <div class="checkin-progress" role="progressbar" aria-label="Check-in progress" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1">
+                <span data-step-dot="1" class="active current"></span>
                 <span data-step-dot="2"></span>
                 <span data-step-dot="3"></span>
                 <span data-step-dot="4"></span>
                 <span data-step-dot="5"></span>
-                <span data-step-dot="6"></span>
             </div>
 
             @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'services' => $services])

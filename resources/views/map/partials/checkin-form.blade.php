@@ -58,14 +58,10 @@
         <p class="checkin-help">What are you into? Tap as many as you like — no wrong answers.</p>
         <div id="interest-options" class="interest-grid" role="group" aria-label="Interests">
             @foreach (($services ?? collect()) as $service)
-                {{-- Use div chips (not label) so phone CSS for form labels cannot hide them. --}}
-                <div
-                    class="interest-chip"
-                    style="--interest-color: {{ $service->color ?: '#007aff' }}; display:flex; align-items:center; gap:0.65rem; min-height:54px; padding:0.85rem 0.95rem; margin:0; border-radius:1rem; border:1.5px solid rgba(0,0,0,.12); background:#f5f5f7; color:#1d1d1f; font-weight:700; font-size:1rem;"
-                >
-                    <input type="checkbox" name="services[]" value="{{ $service->id }}" style="width:1.2rem;height:1.2rem;flex:none;margin:0;">
-                    <span class="interest-option-swatch" aria-hidden="true" style="width:.7rem;height:.7rem;border-radius:999px;background:{{ $service->color ?: '#007aff' }};flex:none;"></span>
-                    <span class="interest-option-label" style="color:#1d1d1f;font-weight:700;">{{ $service->name }}</span>
+                <div class="interest-chip" style="--interest-color: {{ $service->color ?: '#007aff' }}">
+                    <input type="checkbox" name="services[]" value="{{ $service->id }}" aria-label="{{ $service->name }}">
+                    <span class="interest-option-swatch" aria-hidden="true"></span>
+                    <span class="interest-option-label">{{ $service->name }}</span>
                 </div>
             @endforeach
         </div>
@@ -75,19 +71,23 @@
     </section>
 
     <section data-step="4" class="checkin-step hidden">
-        <p class="checkin-help" id="location-help">If we know your company pin, confirm it. Otherwise search a place or tap the map.</p>
+        <p class="checkin-help" id="location-help">Search for your office or area, or tap the map to drop your pin.</p>
         <div class="location-banner" id="location-banner" hidden>
             <strong id="location-banner-title">Location ready</strong>
             <p id="location-banner-copy"></p>
             <button type="button" id="location-adjust-btn" class="btn-secondary">Adjust on map</button>
         </div>
-        <div class="location-search">
-            <input id="location-query" type="search" placeholder="KL, Penang, JB, Kuching…" autocomplete="off">
+        <div class="location-search" id="location-search" role="search">
+            <label for="location-query" class="sr-only">Search for a place in Malaysia</label>
+            <span class="location-search-icon" aria-hidden="true"></span>
+            <input id="location-query" type="search" inputmode="search" enterkeyhint="search" placeholder="Search a place, e.g. Mid Valley, Penang" autocomplete="off"
+                role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="location-results">
             <button type="button" id="location-search-btn">Search</button>
         </div>
-        <ul id="location-results" class="location-results"></ul>
+        <p id="location-status" class="location-status" role="status" aria-live="polite" hidden></p>
+        <ul id="location-results" class="location-results" role="listbox" aria-label="Matching places" hidden></ul>
         <div id="checkin-map" class="checkin-map"></div>
-        <p class="checkin-help">Drag the map to look around — your avatar stays pinned. Drag the avatar to fine-tune.</p>
+        <p class="checkin-help">Can’t find it? Tap the map near your area, then drag your avatar to the exact spot.</p>
         <div class="checkin-grid">
             <label>City
                 <input type="text" name="city" maxlength="120">
@@ -143,12 +143,14 @@
 
     <section data-step="6" class="checkin-step hidden">
         <div class="success-panel">
+            <div class="success-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
             <img id="success-avatar" class="success-avatar-img" alt="" width="96" height="96">
-            <p class="checkin-eyebrow">You’re in</p>
-            <h3 id="success-title">Looking good!</h3>
+                        <h3 id="success-title">Looking good!</h3>
             <p id="success-copy">Look up at the booth screen — your avatar should appear in a few seconds.</p>
             @isset($showMapLink)
-                <a class="btn-primary" href="{{ route('map') }}" style="display:inline-flex;margin-top:1rem;text-decoration:none;align-items:center">See the map</a>
+                <a class="btn-primary success-map-link" href="{{ route('map') }}">See the live map</a>
             @endisset
         </div>
     </section>

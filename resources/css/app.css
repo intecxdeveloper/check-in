@@ -701,7 +701,7 @@
     color: #6e6e73;
 }
 
-.checkin-step input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]),
+.checkin-step input:where(:not([type="checkbox"]):not([type="file"]):not([type="hidden"])),
 .checkin-step input[type="text"],
 .checkin-step input[type="email"],
 .checkin-step input[type="tel"],
@@ -748,8 +748,6 @@
 
 .message-composer input {
     margin-top: 0.35rem;
-    background: #fff !important;
-    border-color: rgba(0, 122, 255, 0.28) !important;
 }
 
 .message-bubble-preview {
@@ -785,62 +783,10 @@
     min-height: 3rem;
 }
 
-/* Div chips — never use form <label> styles on phones. */
-.interest-chip {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 0.65rem !important;
-    box-sizing: border-box;
-    width: 100%;
-    min-height: 54px;
-    padding: 0.85rem 0.95rem;
-    margin: 0;
-    border-radius: 1rem;
-    border: 1.5px solid rgba(0, 0, 0, 0.12);
-    background: #f5f5f7 !important;
-    color: #1d1d1f !important;
-    font-size: 1rem;
-    font-weight: 700;
-    line-height: 1.25;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-.interest-chip.is-selected,
-.interest-chip:has(input:checked) {
-    border-color: #007aff;
-    background: rgba(0, 122, 255, 0.1) !important;
-}
-
-.interest-chip input[type="checkbox"] {
-    width: 1.2rem;
-    height: 1.2rem;
-    flex: 0 0 auto;
-    margin: 0;
-    accent-color: var(--interest-color, #007aff);
-    opacity: 1 !important;
-    visibility: visible !important;
-    position: static !important;
-}
-
-.interest-option-swatch {
-    width: 0.7rem;
-    height: 0.7rem;
-    border-radius: 999px;
-    background: var(--interest-color, #007aff);
-    flex: 0 0 auto;
-}
-
-.interest-option-label {
-    flex: 1 1 auto;
-    min-width: 0;
-    color: #1d1d1f !important;
-    font-weight: 700 !important;
-}
+/* Div chips (not <label>) so phone label styles never hide them; look lives in the wizard section below. */
+.interest-chip { display: flex; align-items: center; gap: 0.65rem; width: 100%; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.interest-chip input[type="checkbox"] { position: static; opacity: 1; visibility: visible; accent-color: var(--interest-color, #007aff); }
+.interest-option-label { flex: 1 1 auto; min-width: 0; }
 
 .location-search {
     display: grid;
@@ -1297,3 +1243,181 @@
 .staff-pill[data-status="closed"] { background: rgba(0, 0, 0, 0.06); color: var(--color-mute); }
 .staff-bar { height: 0.3rem; border-radius: 999px; background: rgba(0, 0, 0, 0.06); overflow: hidden; }
 .staff-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--color-blue); opacity: 0.75; }
+
+/* ---------- Check-in wizard (visitor, phone-first) ---------- */
+.checkin-sheet {
+    --ck-ink: var(--color-ink);
+    --ck-mute: #6e6e73;
+    --ck-line: rgba(0, 0, 0, 0.1);
+    --ck-field: #fff;
+    --ck-soft: #f5f5f7;
+    --ck-accent: var(--color-blue);
+    --ck-radius: 0.875rem;
+    font-weight: 500;
+    color: var(--ck-ink);
+    -webkit-font-smoothing: antialiased;
+}
+.checkin-only-bg { background: var(--color-canvas); }
+.checkin-only-hero h1 { font-weight: 700; letter-spacing: -0.025em; }
+.checkin-only-hero p { font-weight: 500; font-size: 0.95rem; line-height: 1.5; }
+.checkin-modal-page .checkin-sheet,
+.checkin-sheet {
+    border: 1px solid var(--color-line);
+    border-radius: 1.5rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.06);
+    padding: 1.5rem 1.5rem 0;
+}
+.checkin-modal-page .checkin-sheet { width: min(640px, 100%); }
+.checkin-sheet .checkin-header { margin-bottom: 1rem; }
+.checkin-sheet .checkin-eyebrow {
+    font-size: 0.8rem; font-weight: 600; letter-spacing: 0.02em; color: var(--ck-mute);
+    font-variant-numeric: tabular-nums;
+}
+.checkin-sheet h2 {
+    margin: 0.2rem 0 0; font-size: clamp(1.5rem, 4.5vw, 1.85rem); font-weight: 700; letter-spacing: -0.025em; line-height: 1.15;
+}
+.checkin-sheet h2:focus { outline: none; }
+.checkin-sheet .checkin-progress { gap: 0.3rem; margin-bottom: 1.25rem; }
+.checkin-sheet .checkin-progress span { height: 4px; background: #e5e5ea; transition: background-color 240ms ease; }
+.checkin-sheet .checkin-progress span.active { background: var(--ck-accent); }
+.checkin-sheet .checkin-progress span.current { background: var(--ck-accent); opacity: 0.55; }
+.checkin-sheet[data-current-step="6"] .checkin-progress span { background: var(--color-green); opacity: 1; }
+
+.checkin-sheet .checkin-step { animation: ck-step-in 220ms ease-out; }
+@keyframes ck-step-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.checkin-sheet .checkin-help { margin: 0.4rem 0 0; font-size: 0.875rem; line-height: 1.5; font-weight: 500; color: var(--ck-mute); }
+.checkin-sheet .checkin-step > .checkin-help:first-child { margin: 0 0 0.25rem; font-size: 0.95rem; }
+
+.checkin-sheet .checkin-step label { margin-top: 1rem; gap: 0.4rem; font-size: 0.875rem; font-weight: 600; color: var(--ck-ink); }
+.checkin-sheet .checkin-step label:not(.consent-toggle):not(.avatar-upload-btn) { grid-template-columns: 1fr auto; align-items: baseline; }
+.checkin-sheet .checkin-step label:not(.consent-toggle):not(.avatar-upload-btn) > span:not(.sr-only) { font-weight: 500; color: var(--ck-mute); font-size: 0.8rem; margin: 0; }
+.checkin-sheet .checkin-step label > input { grid-column: 1 / -1; }
+.checkin-sheet .checkin-step .avatar-upload-btn span { color: #fff; font-size: 0.9rem; font-weight: 600; }
+.checkin-sheet .checkin-step input[type="text"],
+.checkin-sheet .checkin-step input[type="email"],
+.checkin-sheet .checkin-step input[type="tel"],
+.checkin-sheet .checkin-step input[type="url"],
+.checkin-sheet .checkin-step input[type="search"] {
+    width: 100%; min-height: 48px; padding: 0.75rem 0.9rem;
+    font: inherit; font-size: 1rem; font-weight: 500; color: var(--ck-ink);
+    background: var(--ck-field); border: 1px solid var(--ck-line); border-radius: var(--ck-radius);
+    box-shadow: none; transition: border-color 150ms ease, box-shadow 150ms ease;
+    -webkit-appearance: none; appearance: none;
+}
+.checkin-sheet .checkin-step input::placeholder { color: #a1a1a6; font-weight: 400; }
+.checkin-sheet .checkin-step input:focus { outline: none; border-color: var(--ck-accent); box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.18); }
+.checkin-sheet .checkin-step input[aria-invalid="true"] { border-color: #d70015; box-shadow: 0 0 0 3px rgba(215, 0, 21, 0.12); }
+.checkin-sheet .checkin-grid { gap: 0 0.75rem; }
+.checkin-sheet .sr-only { position: absolute !important; width: 1px; height: 1px; margin: -1px !important; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Avatar studio */
+.checkin-sheet .avatar-studio { gap: 1rem; padding: 1rem; border: 1px solid var(--ck-line); border-radius: 1.1rem; background: var(--ck-soft); margin-top: 0.75rem; }
+.checkin-sheet .avatar-studio-label { font-size: 0.8rem; font-weight: 600; color: var(--ck-mute); text-transform: none; letter-spacing: 0; }
+.checkin-sheet .avatar-preset { min-width: 44px; min-height: 44px; border-width: 2px; }
+.checkin-sheet .avatar-preset.active { border-color: var(--ck-accent); box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.18); }
+.checkin-sheet .avatar-upload-btn,
+.checkin-sheet .avatar-clear-btn { min-height: 44px; display: inline-flex; align-items: center; border-radius: 999px; }
+.checkin-sheet .checkin-step .avatar-upload-btn { margin-top: 0; padding: 0 1rem; background: var(--ck-ink); box-shadow: none; }
+
+/* Company suggestions + place results share a list style */
+.checkin-sheet .location-results { margin: 0.5rem 0 0; padding: 0.25rem; list-style: none; border: 1px solid var(--ck-line); border-radius: 1rem; background: #fff; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); max-height: 18rem; overflow: auto; }
+.checkin-sheet .location-results[hidden] { display: none; }
+.checkin-sheet .location-results button,
+.checkin-sheet #location-results [role="option"] {
+    display: flex; gap: 0.75rem; align-items: flex-start; width: 100%; min-height: 52px; padding: 0.7rem 0.75rem;
+    border: 0; border-radius: 0.75rem; background: transparent; text-align: left; cursor: pointer; font: inherit; color: var(--ck-ink); box-shadow: none;
+}
+.checkin-sheet .location-results button:hover,
+.checkin-sheet #location-results [role="option"]:hover,
+.checkin-sheet #location-results [aria-selected="true"] { background: rgba(0, 122, 255, 0.07); }
+.checkin-sheet #location-results li + li { margin-top: 0.125rem; }
+.checkin-sheet .location-results strong { display: block; font-size: 0.95rem; font-weight: 600; }
+.checkin-sheet .location-results small { display: block; margin-top: 0.1rem; font-size: 0.8rem; font-weight: 500; color: var(--ck-mute); line-height: 1.4; }
+.location-option-icon { flex: none; width: 2rem; height: 2rem; margin-top: 0.05rem; border-radius: 0.6rem; background: var(--ck-soft, #f5f5f7) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-6-5.7-6-11a6 6 0 1 1 12 0c0 5.3-6 11-6 11z'/%3E%3Ccircle cx='12' cy='10' r='2.2'/%3E%3C/svg%3E") center / 1rem no-repeat; }
+.location-option-text { min-width: 0; }
+
+/* Place search */
+.checkin-sheet .location-search { position: relative; display: flex; gap: 0.5rem; margin-top: 1rem; }
+.checkin-sheet .checkin-step .location-search input[type="search"] { padding-left: 2.6rem; }
+.checkin-sheet .location-search input[type="search"]::-webkit-search-cancel-button { display: none; }
+.location-search-icon { position: absolute; left: 0.9rem; top: 50%; width: 1.1rem; height: 1.1rem; transform: translateY(-50%); pointer-events: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") center / contain no-repeat; }
+.checkin-sheet #location-search-btn { flex: none; min-height: 48px; padding: 0 1.1rem; border-radius: var(--ck-radius); background: var(--ck-ink); box-shadow: none; font-size: 0.95rem; font-weight: 600; }
+.location-search[aria-busy="true"] .location-search-icon { border: 2px solid #d1d1d6; border-top-color: var(--color-blue); border-radius: 999px; background: none; width: 1rem; height: 1rem; animation: ck-spin 700ms linear infinite; }
+@keyframes ck-spin { to { transform: translateY(-50%) rotate(360deg); } }
+.location-status { margin: 0.5rem 0 0; font-size: 0.85rem; font-weight: 500; line-height: 1.45; color: var(--color-mute); }
+.location-status[data-tone="ok"] { color: #1f7a37; }
+.location-status[data-tone="warn"] { color: #8a5300; }
+.location-status[data-tone="error"] { padding: 0.65rem 0.8rem; border-radius: 0.75rem; background: rgba(255, 149, 0, 0.1); color: #8a5300; }
+.checkin-sheet .checkin-map { margin-top: 0.75rem; border-radius: 1rem; border: 1px solid var(--ck-line); min-height: 260px; }
+.checkin-sheet .location-banner { border-radius: 1rem; background: rgba(52, 199, 89, 0.08); border: 1px solid rgba(52, 199, 89, 0.22); box-shadow: none; }
+
+/* Interests */
+.checkin-sheet .interest-grid { gap: 0.5rem; margin-top: 0.75rem; }
+.checkin-sheet .interest-chip {
+    position: relative; display: flex; align-items: center; gap: 0.7rem; min-height: 52px; margin: 0;
+    padding: 0.8rem 0.9rem; border-radius: var(--ck-radius); border: 1px solid var(--ck-line); background: #fff;
+    color: var(--ck-ink); font-size: 0.95rem; font-weight: 600; cursor: pointer; box-shadow: none;
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+.checkin-sheet .interest-chip.is-selected,
+.checkin-sheet .interest-chip:has(input:checked) { border-color: var(--interest-color, var(--ck-accent)); background: color-mix(in srgb, var(--interest-color, #007aff) 7%, #fff); box-shadow: inset 0 0 0 1px var(--interest-color, var(--ck-accent)); }
+.checkin-sheet .interest-chip input[type="checkbox"] { order: 3; margin: 0 0 0 auto; width: 1.25rem; height: 1.25rem; flex: none; accent-color: var(--interest-color, var(--ck-accent)); }
+.checkin-sheet .interest-chip:has(input:focus-visible) { outline: 3px solid rgba(0, 122, 255, 0.4); outline-offset: 2px; }
+.checkin-sheet .interest-option-swatch { width: 0.6rem; height: 0.6rem; border-radius: 999px; background: var(--interest-color, var(--ck-accent)); flex: none; }
+.checkin-sheet .interest-option-label { color: var(--ck-ink); font-weight: 600; }
+
+/* Review + consent */
+.checkin-sheet .consent-card { border-radius: 1rem; background: var(--ck-soft); border: 1px solid var(--ck-line); padding: 0.9rem 1rem; box-shadow: none; }
+.checkin-sheet .consent-card p { margin: 0.2rem 0; font-size: 0.875rem; font-weight: 500; line-height: 1.5; color: var(--ck-mute); }
+.checkin-sheet .consent-card strong { color: var(--ck-ink); font-weight: 600; }
+.checkin-sheet .consent-toggle,
+.checkin-sheet .consent-toggle-fun {
+    display: flex; align-items: center; gap: 0.75rem; min-height: 52px; margin-top: 0.5rem; padding: 0.75rem 0.9rem;
+    border: 1px solid var(--ck-line); border-radius: var(--ck-radius); background: #fff; box-shadow: none; cursor: pointer;
+}
+.checkin-sheet .consent-toggle:has(input:checked) { border-color: rgba(0, 122, 255, 0.35); background: rgba(0, 122, 255, 0.04); }
+.checkin-sheet .consent-toggle input { margin: 0; width: 1.25rem; height: 1.25rem; flex: none; accent-color: var(--ck-accent); }
+.checkin-sheet .consent-toggle input[aria-invalid="true"] { outline: 2px solid #d70015; outline-offset: 2px; }
+.checkin-sheet .consent-toggle span { margin: 0; font-size: 0.925rem; font-weight: 500; color: var(--ck-ink); }
+.checkin-sheet .message-composer { margin-top: 1rem; padding: 0; background: none; border: 0; box-shadow: none; }
+.checkin-sheet .message-bubble-preview span { font-weight: 600; }
+
+/* Errors */
+.checkin-sheet .checkin-error { display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 1rem; padding: 0.75rem 0.9rem; border-radius: 0.75rem; background: rgba(215, 0, 21, 0.06); border: 1px solid rgba(215, 0, 21, 0.18); color: #b0000f; font-size: 0.9rem; font-weight: 600; line-height: 1.4; }
+
+/* Sticky actions: full-width primary, always reachable */
+.checkin-sheet .checkin-actions {
+    margin: 1.25rem -1.5rem 0; padding: 0.85rem 1.5rem max(0.85rem, env(safe-area-inset-bottom));
+    gap: 0.6rem; background: rgba(255, 255, 255, 0.96); border-top: 1px solid var(--color-line);
+    border-radius: 0 0 1.5rem 1.5rem;
+}
+.checkin-sheet .btn-primary,
+.checkin-sheet .btn-secondary { min-height: 52px; border-radius: var(--ck-radius); font-size: 1rem; font-weight: 600; transition: background-color 150ms ease, transform 120ms ease, opacity 150ms ease; }
+.checkin-sheet .checkin-actions .btn-primary { flex: 1; background: var(--ck-accent); box-shadow: none; }
+.checkin-sheet .checkin-actions .btn-secondary { flex: 0 0 auto; padding: 0 1.25rem; background: #fff; border: 1px solid var(--ck-line); }
+.checkin-sheet .btn-primary:hover { background: #0068d9; }
+.checkin-sheet .btn-primary:active,
+.checkin-sheet .btn-secondary:active { transform: scale(0.98); }
+.checkin-sheet .btn-primary:disabled { opacity: 0.6; cursor: progress; }
+@media (min-width: 720px) { .checkin-sheet .checkin-actions .btn-primary { flex: 0 0 auto; min-width: 12rem; } }
+
+/* Success */
+.checkin-sheet .success-panel { padding: 1.5rem 0.25rem 0.5rem; }
+.success-badge { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; margin: 0 auto 1rem; border-radius: 999px; background: var(--color-green); color: #fff; animation: ck-pop 360ms cubic-bezier(.2, .9, .3, 1.2); }
+@keyframes ck-pop { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.checkin-sheet .success-panel h3 { margin: 1rem 0 0.35rem; font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+.checkin-sheet .success-panel p { max-width: 24rem; margin: 0 auto; font-weight: 500; line-height: 1.5; }
+.success-map-link { display: inline-flex; align-items: center; justify-content: center; margin-top: 1.25rem; padding: 0 1.5rem; text-decoration: none; }
+.checkin-sheet[data-current-step="6"] .checkin-actions { border-top: 0; }
+
+@media (max-width: 720px) {
+    .checkin-modal-page { padding: 0.5rem 0.5rem 0; }
+    .checkin-modal-page .checkin-sheet,
+    .checkin-sheet { padding: 1.25rem 1.1rem 0; border-radius: 1.25rem 1.25rem 0 0; }
+    .checkin-sheet .checkin-actions { margin: 1.25rem -1.1rem 0; padding-left: 1.1rem; padding-right: 1.1rem; border-radius: 0; }
+    .checkin-sheet .avatar-studio { padding: 0.85rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .location-search[aria-busy="true"] .location-search-icon { animation: none !important; }
+}
