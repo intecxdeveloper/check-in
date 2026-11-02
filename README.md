@@ -42,3 +42,12 @@ See `config/expo.php` and `.env`:
 - `EXPO_MAP_STYLE` — MapLibre style URL (default OpenFreeMap dark)
 - `EXPO_PRIVACY_VERSION` — privacy notice version stored with each visitor
 - `EXPO_GEOCODER_USER_AGENT` — required Nominatim User-Agent
+
+## Deployment
+
+1. `cp .env.example .env`, then set `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://…`, `LOG_LEVEL=warning`, `SESSION_ENCRYPT=true`, and `TRUSTED_PROXIES` if behind a proxy.
+2. `composer install --no-dev --optimize-autoloader && npm ci && npm run build` (delete `public/hot` if present).
+3. `php artisan key:generate && php artisan migrate --force && php artisan db:seed --force` (in production the seeder only creates services; demo `@expo.test` accounts are local-only and blocked from login in production).
+4. Create staff logins: `php artisan expo:staff you@company.com --name="Your Name"` (prompts for a 12+ character password).
+5. `php artisan storage:link`, then `php artisan config:cache route:cache view:cache event:cache` (run each `*:cache` command).
+6. Serve over HTTPS; health check at `/up`. Back up `database/database.sqlite` and `storage/app/public/avatars` regularly.
