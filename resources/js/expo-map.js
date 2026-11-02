@@ -181,20 +181,18 @@ export function createExpoMap(root, maplibregl) {
         });
 
         ensureMarkerLayer();
-        let markerSyncRaf = 0;
-        const scheduleMarkerSync = () => {
-            if (markerSyncRaf) {
-                return;
-            }
-            markerSyncRaf = requestAnimationFrame(() => {
-                markerSyncRaf = 0;
-                syncMarkerPositions();
-            });
-        };
-        map.on('render', scheduleMarkerSync);
-        map.on('move', scheduleMarkerSync);
-        map.on('zoom', scheduleMarkerSync);
-        map.on('resize', scheduleMarkerSync);
+        // Pins are positioned synchronously inside MapLibre's own frame ('move' fires
+        // right before it paints), so they never trail the basemap by a frame while
+        // dragging. Decluttering only reruns when the zoom level settles.
+        map.on('move', syncMarkerPositions);
+        map.on('resize', () => {
+            readMapSize();
+            syncMarkerPositions();
+        });
+        map.on('zoomend', () => {
+            declutterMarkers();
+            syncMarkerPositions();
+        });
 
         const loadTimeout = setTimeout(() => {
             if (! mapReady) {
@@ -226,23 +224,73 @@ export function createExpoMap(root, maplibregl) {
         return layer;
     }
 
-    function syncMarkerPositions() {
+    let mapWidth = 0;
+    let mapHeight = 0;
+    const DECLUTTER_CELL_PX = 64;
+    const OFFSCREEN_MARGIN_PX = 120;
+
+    function readMapSize() {
+        const container = map?.getContainer();
+        mapWidth = container?.clientWidth || 0;
+        mapHeight = container?.clientHeight || 0;
+    }
+
+    // With hundreds of check-ins, most pins sit on top of each other and every one of
+    // them used to be moved, shadowed and composited on every drag frame. Keep only the
+    // newest pin per ~64px screen cell at the current zoom; zooming in reveals the rest.
+    // Cells are computed in world pixels, so panning never changes the result.
+    function declutterMarkers() {
         if (! map) {
             return;
         }
 
-        for (const entry of markersById.values()) {
-            const point = map.project(entry.lngLat);
-            const width = map.getContainer().clientWidth;
-            const height = map.getContainer().clientHeight;
-            const visible = Number.isFinite(point.x) && Number.isFinite(point.y)
-                && point.x > -120 && point.y > -120
-                && point.x < width + 120
-                && point.y < height + 120;
+        const zoom = map.getZoom();
+        const worldSize = 512 * 2 ** zoom;
+        const taken = new Set();
+        const entries = [...markersById.values()].sort((a, b) => b.rank - a.rank);
 
-            entry.el.style.opacity = visible ? '1' : '0';
-            entry.el.style.pointerEvents = visible ? 'auto' : 'none';
-            entry.el.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -100%)`;
+        for (const entry of entries) {
+            const { lng, lat } = entry.lngLat;
+            const sin = Math.sin((Math.max(-85, Math.min(85, lat)) * Math.PI) / 180);
+            const x = ((lng + 180) / 360) * worldSize;
+            const y = (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * worldSize;
+            const cell = `${Math.floor(x / DECLUTTER_CELL_PX)}:${Math.floor(y / DECLUTTER_CELL_PX)}`;
+            entry.clustered = taken.has(cell) && ! entry.pinned;
+            taken.add(cell);
+        }
+    }
+
+    function setMarkerShown(entry, shown) {
+        if (entry.shown === shown) {
+            return;
+        }
+        entry.shown = shown;
+        entry.el.style.display = shown ? '' : 'none';
+    }
+
+    function syncMarkerPositions() {
+        if (! map) {
+            return;
+        }
+        if (! mapWidth) {
+            readMapSize();
+        }
+
+        for (const entry of markersById.values()) {
+            if (entry.clustered) {
+                setMarkerShown(entry, false);
+                continue;
+            }
+
+            const point = map.project(entry.lngLat);
+            const visible = point.x > -OFFSCREEN_MARGIN_PX && point.y > -OFFSCREEN_MARGIN_PX
+                && point.x < mapWidth + OFFSCREEN_MARGIN_PX
+                && point.y < mapHeight + OFFSCREEN_MARGIN_PX;
+
+            setMarkerShown(entry, visible);
+            if (visible) {
+                entry.el.style.transform = `translate3d(${Math.round(point.x)}px, ${Math.round(point.y)}px, 0) translate(-50%, -100%)`;
+            }
         }
     }
 
@@ -280,17 +328,19 @@ export function createExpoMap(root, maplibregl) {
                 const entry = markersById.get(id);
                 entry.lngLat = lngLat;
                 entry.props = props;
+                entry.pinned = shouldPop;
                 updatePeopleMarker(entry.el, props, shouldPop);
             } else {
                 const el = createPeopleMarker(props, shouldPop);
                 layer.appendChild(el);
-                markersById.set(id, { el, lngLat, props });
+                markersById.set(id, { el, lngLat, props, rank: Number(id) || 0, pinned: shouldPop, shown: true, clustered: false });
             }
 
             knownIds.add(Number(id));
             knownIds.add(id);
         }
 
+        declutterMarkers();
         syncMarkerPositions();
 
         if (highlightId) {
