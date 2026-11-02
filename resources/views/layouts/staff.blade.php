@@ -2,34 +2,36 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="theme-color" content="#ffffff">
     <title>@yield('title', 'Staff') · Expo Check-in</title>
     @vite(['resources/css/app.css'])
 </head>
-<body class="min-h-screen bg-slate-100 text-slate-900 antialiased">
-    <header class="border-b border-slate-200 bg-white">
-        <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Staff</p>
-                <h1 class="text-lg font-semibold">Expo Visitor Desk</h1>
-            </div>
+<body class="staff-body min-h-screen antialiased">
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:shadow">Skip to content</a>
+    <header class="sticky top-0 z-20 border-b border-black/[0.06] bg-white/90 backdrop-blur">
+        <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+            <a href="{{ route('staff.dashboard') }}" class="flex items-baseline gap-2">
+                <span class="text-[0.95rem] font-bold tracking-tight">Visitor Desk</span>
+                <span class="text-xs font-semibold text-mute">Staff</span>
+            </a>
             @auth
-                <nav class="flex items-center gap-3 text-sm">
-                    <a href="{{ route('staff.dashboard') }}" class="rounded-lg px-3 py-2 hover:bg-slate-100">Dashboard</a>
-                    <a href="{{ route('staff.visitors') }}" class="rounded-lg px-3 py-2 hover:bg-slate-100">Visitors</a>
-                    <a href="{{ route('map') }}" class="rounded-lg px-3 py-2 hover:bg-slate-100" target="_blank">Map</a>
-                    <form method="POST" action="{{ route('staff.logout') }}">
+                <nav class="staff-nav -mx-1 flex items-center gap-1 overflow-x-auto text-sm font-semibold" aria-label="Staff">
+                    <a href="{{ route('staff.dashboard') }}" @if (request()->routeIs('staff.dashboard')) aria-current="page" @endif class="rounded-full px-3 py-1.5 hover:bg-black/[0.05]">Overview</a>
+                    <a href="{{ route('staff.visitors') }}" @if (request()->routeIs('staff.visitors')) aria-current="page" @endif class="rounded-full px-3 py-1.5 hover:bg-black/[0.05]">Visitors</a>
+                    <a href="{{ route('map') }}" target="_blank" rel="noopener" class="rounded-full px-3 py-1.5 hover:bg-black/[0.05]">Live map <span aria-hidden="true">↗</span><span class="sr-only">(opens in new tab)</span></a>
+                    <form method="POST" action="{{ route('staff.logout') }}" class="ml-1">
                         @csrf
-                        <button class="rounded-lg bg-slate-900 px-3 py-2 text-white">Log out</button>
+                        <button class="rounded-full px-3 py-1.5 text-mute hover:bg-black/[0.05] hover:text-ink">Log out</button>
                     </form>
                 </nav>
             @endauth
         </div>
     </header>
-    <main class="mx-auto max-w-6xl px-4 py-6">
+    <main id="main" class="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         @if (session('status'))
-            <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800">
+            <div role="status" class="mb-5 rounded-xl border border-green/25 bg-green/10 px-4 py-3 text-sm font-medium text-[#1f7a37]">
                 {{ session('status') }}
             </div>
         @endif
