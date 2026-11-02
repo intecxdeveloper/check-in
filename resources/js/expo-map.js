@@ -61,21 +61,37 @@ export function createExpoMap(root, maplibregl) {
     root.querySelector('#company-card-close')?.addEventListener('click', closeCompanyCard);
 
     let pollInFlight = false;
-    refreshStats().catch((error) => console.error(error));
+    let pollTick = 0;
+    let lastPolledCheckIns = null;
+    refreshStats()
+        .then((count) => { lastPolledCheckIns = count; })
+        .catch((error) => console.error(error));
     refreshRecent({ announce: false }).catch((error) => console.error(error));
     setInterval(async () => {
         if (pollInFlight || document.hidden) {
             return;
         }
         pollInFlight = true;
+        pollTick += 1;
         try {
-            await Promise.all([
-                refreshStats().catch((error) => console.error(error)),
-                refreshRecent({ announce: true }).catch((error) => console.error(error)),
-                mapReady
-                    ? refreshCompanies({ animateNew: true }).catch((error) => console.error(error))
-                    : Promise.resolve(),
-            ]);
+            // Stats are tiny; only pull the heavier feed + map payload when the
+            // check-in count moves (or every ~minute as a safety net).
+            const checkIns = await refreshStats().catch((error) => {
+                console.error(error);
+                return null;
+            });
+            const changed = checkIns !== null && checkIns !== lastPolledCheckIns;
+            const safetyNet = pollTick % 12 === 0;
+            lastPolledCheckIns = checkIns ?? lastPolledCheckIns;
+
+            if (changed || safetyNet) {
+                await Promise.all([
+                    refreshRecent({ announce: true }).catch((error) => console.error(error)),
+                    mapReady
+                        ? refreshCompanies({ animateNew: true }).catch((error) => console.error(error))
+                        : Promise.resolve(),
+                ]);
+            }
         } finally {
             pollInFlight = false;
         }
@@ -343,6 +359,8 @@ export function createExpoMap(root, maplibregl) {
             showMilestone('Malaysia is glowing — 8 places joined!');
         }
         lastRegionCount = stats.regions;
+
+        return stats.check_ins;
     }
 
     async function refreshRecent({ announce = true } = {}) {
@@ -459,7 +477,7 @@ export function createExpoMap(root, maplibregl) {
         companyCard.querySelector('#company-card-title').textContent = props.name || 'Company';
         companyCard.querySelector('#company-card-location').textContent = props.location || 'Malaysia';
         companyCard.querySelector('#company-card-services').innerHTML = (props.services || [])
-            .map((service) => `<span class="expo-chip active" style="background:${service.color};color:#fff">${escapeHtml(service.name)}</span>`)
+            .map((service) => `<span class="expo-chip active" style="background:${safeColor(service.color)};color:#fff">${escapeHtml(service.name)}</span>`)
             .join('') || '<span class="expo-chip">Interests private</span>';
         companyCard.querySelector('#company-card-count').textContent = `${props.visitor_count || 1} friend${(props.visitor_count || 1) === 1 ? '' : 's'} checked in`;
 
@@ -741,4 +759,8 @@ function escapeHtml(value) {
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;');
+}
+
+function safeColor(value) {
+    return /^#[0-9a-f]{3,8}$/i.test(String(value || '')) ? value : '#64748b';
 }

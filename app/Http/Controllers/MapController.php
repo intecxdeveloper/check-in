@@ -9,10 +9,16 @@ use App\Support\AvatarPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class MapController extends Controller
 {
+    /** Short shared cache so a full expo hall polling every few seconds hits the DB once. */
+    public const PUBLIC_CACHE_SECONDS = 5;
+
+    public const MAX_MAP_COMPANIES = 2000;
+
     public function index(Request $request): View
     {
         return view('map.index', [
@@ -53,6 +59,22 @@ class MapController extends Controller
 
     public function companies(Request $request): JsonResponse
     {
+        $request->validate([
+            'service' => ['nullable', 'string', 'max:60'],
+            'region' => ['nullable', 'string', 'max:120'],
+            'since' => ['nullable', 'date'],
+        ]);
+
+        $cacheKey = 'map:companies:'.md5(json_encode($request->only(['service', 'region', 'since'])));
+
+        $payload = Cache::remember($cacheKey, now()->addSeconds(self::PUBLIC_CACHE_SECONDS), fn () => $this->buildCompaniesPayload($request));
+
+        return response()->json($payload)
+            ->header('Cache-Control', 'public, max-age='.self::PUBLIC_CACHE_SECONDS);
+    }
+
+    private function buildCompaniesPayload(Request $request): array
+    {
         $query = Company::query()
             ->with(['services:id,name,slug,color'])
             ->withCount('visitors')
@@ -77,7 +99,7 @@ class MapController extends Controller
             $query->where('updated_at', '>=', $since);
         }
 
-        $companies = $query->latest('updated_at')->get();
+        $companies = $query->latest('updated_at')->limit(self::MAX_MAP_COMPANIES)->get();
         $companyIds = $companies->pluck('id');
 
         $latestMessages = Visitor::query()
@@ -108,14 +130,22 @@ class MapController extends Controller
             return $company->toPublicMapFeature();
         })->values();
 
-        return response()->json([
+        return [
             'type' => 'FeatureCollection',
             'features' => $features,
             'generated_at' => now()->toIso8601String(),
-        ]);
+        ];
     }
 
     public function stats(): JsonResponse
+    {
+        $payload = Cache::remember('map:stats', now()->addSeconds(self::PUBLIC_CACHE_SECONDS), fn () => $this->buildStatsPayload());
+
+        return response()->json($payload)
+            ->header('Cache-Control', 'public, max-age='.self::PUBLIC_CACHE_SECONDS);
+    }
+
+    private function buildStatsPayload(): array
     {
         $publicCompanies = Company::query()
             ->where('public_display_enabled', true)
@@ -126,25 +156,46 @@ class MapController extends Controller
             ->selectRaw("COUNT(DISTINCT COALESCE(NULLIF(region, ''), NULLIF(country, ''), NULLIF(city, ''))) as aggregate")
             ->value('aggregate');
 
-        return response()->json([
+        return [
             'check_ins' => Visitor::count(),
             'companies' => (clone $publicCompanies)->count(),
             'regions' => (int) $regions,
             'generated_at' => now()->toIso8601String(),
-        ]);
+        ];
     }
 
     public function recent(): JsonResponse
     {
         $items = Visitor::query()
+            ->select(['id', 'company_id', 'full_name', 'display_message', 'avatar_path', 'avatar_seed', 'created_at'])
             ->with(['company:id,name,city,region,country,public_display_enabled,latitude,longitude'])
             ->latest()
             ->limit(12)
             ->get()
             ->map(function (Visitor $visitor) {
                 $company = $visitor->company;
+                $isPublic = (bool) $company?->public_display_enabled;
 
                 $firstName = trim(explode(' ', trim((string) $visitor->full_name))[0] ?? '');
+
+                // Visitors who opted out of the public map stay anonymous on the
+                // public feed: no company, location, message or photo.
+                if (! $isPublic) {
+                    return [
+                        'id' => $visitor->id,
+                        'company_id' => null,
+                        'first_name' => null,
+                        'company' => null,
+                        'location' => null,
+                        'message' => null,
+                        'avatar_url' => AvatarPresenter::url(null, null, 'guest-'.$visitor->id),
+                        'public' => false,
+                        'latitude' => null,
+                        'longitude' => null,
+                        'at' => $visitor->created_at?->diffForHumans(),
+                        'created_at' => $visitor->created_at?->toIso8601String(),
+                    ];
+                }
 
                 return [
                     'id' => $visitor->id,
@@ -158,7 +209,7 @@ class MapController extends Controller
                         $visitor->avatar_seed,
                         $company?->name ?: ($firstName ?: 'friend')
                     ),
-                    'public' => (bool) $company?->public_display_enabled,
+                    'public' => true,
                     'latitude' => $company?->latitude,
                     'longitude' => $company?->longitude,
                     'at' => $visitor->created_at?->diffForHumans(),
