@@ -14,7 +14,7 @@
 
                 <div class="avatar-upload-row">
                     <label class="avatar-upload-btn">
-                        <input id="avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
+                        <input id="avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" hidden>
                         <span>Upload photo / logo</span>
                     </label>
                     <button type="button" id="avatar-clear-upload" class="avatar-clear-btn hidden">Use preset</button>

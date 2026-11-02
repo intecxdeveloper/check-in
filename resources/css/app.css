@@ -1264,3 +1264,36 @@
         transition: none !important;
     }
 }
+
+/* Upload button label must stay readable on blue (overrides .checkin-step label span). */
+.checkin-step .avatar-upload-btn, .checkin-step .avatar-upload-btn span { color: #fff; font-size: 0.84rem; font-weight: 750; margin: 0; }
+.avatar-upload-btn:focus-within,
+.avatar-clear-btn:focus-visible {
+    outline: 3px solid rgba(0, 122, 255, 0.35);
+    outline-offset: 2px;
+}
+
+/* Keyboard focus that is visible everywhere without affecting mouse/touch users. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid rgba(0, 122, 255, 0.4);
+    outline-offset: 2px;
+}
+
+/* ---------- Staff desk ---------- */
+.staff-body { font-family: var(--font-sans); background: var(--color-canvas); color: var(--color-ink); }
+.staff-num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.staff-nav a[aria-current="page"] { background: var(--color-ink); color: #fff; }
+.staff-pill {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.15rem 0.55rem; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600; text-transform: capitalize; white-space: nowrap;
+    background: rgba(0, 0, 0, 0.05); color: var(--color-ink);
+}
+.staff-pill::before { content: ''; width: 0.4rem; height: 0.4rem; border-radius: 999px; background: currentColor; opacity: 0.8; }
+.staff-pill[data-status="new"] { background: rgba(0, 122, 255, 0.1); color: #0060c7; }
+.staff-pill[data-status="follow-up"] { background: rgba(255, 149, 0, 0.14); color: #a65e00; }
+.staff-pill[data-status="contacted"] { background: rgba(90, 200, 250, 0.18); color: #00739e; }
+.staff-pill[data-status="qualified"] { background: rgba(52, 199, 89, 0.14); color: #1f7a37; }
+.staff-pill[data-status="closed"] { background: rgba(0, 0, 0, 0.06); color: var(--color-mute); }
+.staff-bar { height: 0.3rem; border-radius: 999px; background: rgba(0, 0, 0, 0.06); overflow: hidden; }
+.staff-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--color-blue); opacity: 0.75; }
