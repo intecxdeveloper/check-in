@@ -49,7 +49,7 @@ class VisitorController extends Controller
     {
         $data = $request->validate([
             'status' => ['required', 'in:'.implode(',', Lead::STATUSES)],
-            'assigned_to' => ['nullable', 'exists:users,id'],
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
             'staff_notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
@@ -96,7 +96,7 @@ class VisitorController extends Controller
                 ->latest()
                 ->chunk(200, function ($visitors) use ($handle) {
                     foreach ($visitors as $visitor) {
-                        fputcsv($handle, [
+                        fputcsv($handle, array_map(self::csvSafe(...), [
                             $visitor->full_name,
                             $visitor->job_title,
                             $visitor->email,
@@ -112,13 +112,27 @@ class VisitorController extends Controller
                             $visitor->lead?->assignee?->name,
                             $visitor->lead?->staff_notes,
                             optional($visitor->created_at)?->toDateTimeString(),
-                        ]);
+                        ]));
                     }
                 });
 
             fclose($handle);
         }, $filename, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store, private',
         ]);
+    }
+
+    /**
+     * Neutralise spreadsheet formulas (=, +, -, @, tab, CR) typed by visitors
+     * so opening the export in Excel or Sheets cannot execute anything.
+     */
+    public static function csvSafe(mixed $value): mixed
+    {
+        if (is_string($value) && $value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 }

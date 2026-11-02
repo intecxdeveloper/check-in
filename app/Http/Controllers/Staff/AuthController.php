@@ -19,8 +19,15 @@ class AuthController extends Controller
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
-            'password' => ['required'],
+            'password' => ['required', 'string', 'max:255'],
         ]);
+
+        // Demo accounts from the local seeder must never work on a live site.
+        if (app()->isProduction() && str_ends_with(strtolower($credentials['email']), '@expo.test')) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'Invalid staff credentials.']);
+        }
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();

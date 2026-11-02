@@ -6,7 +6,9 @@ use App\Http\Requests\StoreCheckInRequest;
 use App\Models\Company;
 use App\Models\Lead;
 use App\Models\Visitor;
+use App\Support\AvatarImage;
 use App\Support\AvatarPresenter;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -38,7 +40,7 @@ class CheckInController extends Controller
 
         $avatarPath = null;
         if ($request->hasFile('avatar')) {
-            $avatarPath = $request->file('avatar')->store('avatars/'.now()->format('Y/m'), 'public');
+            $avatarPath = AvatarImage::store($request->file('avatar'));
         }
 
         $avatarSeed = filled($data['avatar_seed'] ?? null)
@@ -97,6 +99,9 @@ class CheckInController extends Controller
                 'public_display_enabled' => $company->public_display_enabled,
             ];
         });
+
+        Cache::forget('map:stats');
+        Cache::forget('map:companies:'.md5(json_encode([])));
 
         return response()->json([
             'message' => 'Welcome to the network!',

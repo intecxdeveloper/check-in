@@ -44,13 +44,13 @@ class StoreCheckInRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'full_name' => ['required', 'string', 'max:120'],
+            'full_name' => ['required', 'string', 'min:1', 'max:120', 'not_regex:/[<>]/'],
             'job_title' => ['nullable', 'string', 'max:120'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:40'],
             'display_message' => ['nullable', 'string', 'max:80'],
             'avatar_seed' => ['nullable', 'string', 'max:80'],
-            'avatar' => ['nullable', 'image', 'max:4096', 'mimes:jpg,jpeg,png,webp,gif'],
+            'avatar' => ['nullable', 'file', 'max:6144', 'mimes:jpg,jpeg,png,webp', 'dimensions:max_width=8000,max_height=8000'],
             'company_name' => ['required', 'string', 'max:180'],
             'address_text' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:120'],
@@ -58,7 +58,7 @@ class StoreCheckInRequest extends FormRequest
             'country' => ['nullable', 'string', 'max:120'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'public_website' => ['nullable', 'url', 'max:255'],
+            'public_website' => ['nullable', 'url:http,https', 'max:255'],
             'public_display_enabled' => ['required', 'boolean'],
             'follow_up_consent' => ['required', 'boolean'],
             'privacy_accepted' => ['accepted'],
@@ -83,7 +83,8 @@ class StoreCheckInRequest extends FormRequest
             'services.required' => 'Pick at least one interest — any is fine.',
             'services.min' => 'Pick at least one interest — any is fine.',
             'avatar.image' => 'Please upload a photo or logo image.',
-            'avatar.max' => 'Keep uploads under 4MB — a phone photo is perfect.',
+            'avatar.max' => 'Keep uploads under 6MB — a phone photo is perfect.',
+            'avatar.mimes' => 'Please upload a JPG, PNG or WebP photo.',
         ];
     }
 

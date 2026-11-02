@@ -14,6 +14,15 @@ class ExpoSeeder extends Seeder
 {
     public function run(): void
     {
+        // Demo staff logins and sample visitors are for local/demo use only.
+        // In production create real staff with `php artisan expo:staff`.
+        if (app()->isProduction()) {
+            $this->command?->warn('Skipping demo staff and sample visitors in production. Use `php artisan expo:staff` to add staff.');
+            $this->seedServices();
+
+            return;
+        }
+
         $staff = User::query()->updateOrCreate(
             ['email' => 'staff@expo.test'],
             [
@@ -30,7 +39,17 @@ class ExpoSeeder extends Seeder
             ]
         );
 
-        $services = collect([
+        $services = $this->seedServices();
+
+        $this->seedSamples($services, $staff);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<string, Service>
+     */
+    private function seedServices()
+    {
+        return collect([
             ['name' => 'GIS / Geospatial', 'slug' => 'gis', 'color' => '#38bdf8'],
             ['name' => 'Land Management', 'slug' => 'land', 'color' => '#34d399'],
             ['name' => 'Software / IT', 'slug' => 'software', 'color' => '#a78bfa'],
@@ -42,7 +61,10 @@ class ExpoSeeder extends Seeder
 
             return [$service->slug => $service];
         });
+    }
 
+    private function seedSamples($services, User $staff): void
+    {
         $samples = [
             [
                 'company' => [

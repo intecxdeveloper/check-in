@@ -24,7 +24,8 @@ class CompanySearchController extends Controller
         $results = collect();
 
         Company::query()
-            ->where('name', 'like', '%'.$validated['q'].'%')
+            ->where('public_display_enabled', true)
+            ->where('name', 'like', '%'.addcslashes($validated['q'], '%_\\').'%')
             ->orderBy('name')
             ->limit(8)
             ->get(['id', 'name', 'city', 'region', 'country', 'latitude', 'longitude', 'public_website'])
