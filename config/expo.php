@@ -6,8 +6,6 @@ return [
     'brand_mark' => 'images/nadi-spatial-mark.png',
 
     'privacy_notice_version' => env('EXPO_PRIVACY_VERSION', '1.0'),
-    // Public URL encoded in the booth QR. Scan host serves the check-in form at `/`.
-    'check_in_url' => env('EXPO_CHECK_IN_URL', 'https://scan.nadispatial.com'),
     'geocoder_user_agent' => env(
         'EXPO_GEOCODER_USER_AGENT',
         'ExpoVisitorMap/1.0 (booth check-in)'
