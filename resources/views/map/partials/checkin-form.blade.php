@@ -57,21 +57,21 @@
     <section data-step="3" class="checkin-step hidden">
         <p class="checkin-help">What are you into? Tap as many as you like — no wrong answers.</p>
         <div id="interest-options" class="interest-grid" role="group" aria-label="Interests">
-            @foreach (($services ?? collect()) as $service)
-                <div class="interest-chip" style="--interest-color: {{ $service->color ?: '#0058b8' }}">
-                    <input type="checkbox" name="services[]" value="{{ $service->id }}" aria-label="{{ $service->name }}">
+            @foreach (collect($services ?? []) as $service)
+                <div class="interest-chip" style="--interest-color: {{ data_get($service, 'color') ?: '#0058b8' }}">
+                    <input type="checkbox" name="services[]" value="{{ data_get($service, 'id') }}" aria-label="{{ data_get($service, 'name') }}">
                     <span class="interest-option-swatch" aria-hidden="true"></span>
-                    <span class="interest-option-label">{{ $service->name }}</span>
+                    <span class="interest-option-label">{{ data_get($service, 'name') }}</span>
                 </div>
             @endforeach
         </div>
-        @if (($services ?? collect())->isEmpty())
+        @if (collect($services ?? [])->isEmpty())
             <p class="checkin-help" id="interest-empty-hint">Interests are loading… if this stays blank, refresh once.</p>
         @endif
     </section>
 
     <section data-step="4" class="checkin-step hidden">
-        <p class="checkin-help" id="location-help">Search for your office or area, or tap the map to drop your pin.</p>
+        <p class="checkin-help" id="location-help">Search a place, use this phone’s location, or tap the map.</p>
         <div class="location-banner" id="location-banner" hidden>
             <strong id="location-banner-title">Location ready</strong>
             <p id="location-banner-copy"></p>
@@ -84,6 +84,7 @@
                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="location-results">
             <button type="button" id="location-search-btn">Search</button>
         </div>
+        <button type="button" id="location-gps-btn" class="location-gps-btn">Use my location</button>
         <div class="location-status-row">
             @include('partials.aiva', ['pose' => 'work', 'size' => 34, 'class' => 'aiva-status'])
             <p id="location-status" class="location-status" role="status" aria-live="polite" hidden></p>
@@ -91,17 +92,20 @@
         <ul id="location-results" class="location-results" role="listbox" aria-label="Matching places" hidden></ul>
         <div id="checkin-map" class="checkin-map"></div>
         <p class="checkin-help">Can’t find it? Tap the map near your area, then drag your avatar to the exact spot.</p>
-        <div class="checkin-grid">
-            <label>City
-                <input type="text" name="city" maxlength="120">
-            </label>
-            <label>State / region
-                <input type="text" name="region" maxlength="120">
-            </label>
-            <label>Country
-                <input type="text" name="country" maxlength="120" value="Malaysia">
-            </label>
-        </div>
+        <details class="location-details">
+            <summary>Fine-tune city and state</summary>
+            <div class="checkin-grid">
+                <label>City
+                    <input type="text" name="city" maxlength="120" autocomplete="address-level2">
+                </label>
+                <label>State / region
+                    <input type="text" name="region" maxlength="120" autocomplete="address-level1">
+                </label>
+                <label>Country
+                    <input type="text" name="country" maxlength="120" value="Malaysia" autocomplete="country-name">
+                </label>
+            </div>
+        </details>
         <input type="hidden" name="latitude">
         <input type="hidden" name="longitude">
         <input type="hidden" name="address_text">
@@ -126,7 +130,9 @@
                 maxlength="80"
                 placeholder="Hello from Penang!"
                 autocomplete="off"
+                aria-describedby="message-count"
             >
+            <p id="message-count" class="message-count" aria-live="polite">0 / 80</p>
             <div class="message-bubble-preview" aria-hidden="true">
                 <span id="message-bubble-preview-text">Your message will show here</span>
             </div>
@@ -145,7 +151,10 @@
             <input type="checkbox" name="privacy_accepted" value="1" required>
             <span>I’ve read the short privacy note (v{{ $privacyVersion }})</span>
         </label>
-        <p class="checkin-help">Used for this booth experience and authorised follow-up, then cleaned up per company policy.</p>
+        <details class="privacy-note">
+            <summary>What we keep</summary>
+            <p>Used for this booth experience and authorised follow-up, then cleaned up per company policy. Contact details never appear on the public map.</p>
+        </details>
     </section>
 
     <section data-step="6" class="checkin-step hidden">

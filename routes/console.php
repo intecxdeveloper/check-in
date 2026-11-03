@@ -1,14 +1,12 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
+use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
-
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 Artisan::command('expo:staff {email} {--name=}', function (string $email) {
-    $validator = Illuminate\Support\Facades\Validator::make(['email' => $email], ['email' => ['required', 'email']]);
+    $validator = Validator::make(['email' => $email], ['email' => ['required', 'email']]);
     if ($validator->fails()) {
         $this->error('Please pass a valid email address.');
 
@@ -22,9 +20,9 @@ Artisan::command('expo:staff {email} {--name=}', function (string $email) {
         return 1;
     }
 
-    App\Models\User::query()->updateOrCreate(
-        ['email' => Illuminate\Support\Str::lower($email)],
-        ['name' => $this->option('name') ?: Illuminate\Support\Str::before($email, '@'), 'password' => $password],
+    User::query()->updateOrCreate(
+        ['email' => Str::lower($email)],
+        ['name' => $this->option('name') ?: Str::before($email, '@'), 'password' => $password],
     );
 
     $this->info("Staff account ready for {$email}.");

@@ -34,11 +34,11 @@ class DashboardController extends Controller
 
         return view('staff.dashboard', [
             'checkIns' => Visitor::count(),
-            'companies' => Company::count(),
             'publicCompanies' => Company::where('public_display_enabled', true)->count(),
             'byStatus' => $byStatus,
             'byInterest' => $byInterest,
             'byRegion' => $byRegion,
+            'liveMessages' => Visitor::query()->withPublicMessage()->count(),
             'recent' => Visitor::with(['company', 'lead'])->latest()->limit(6)->get(),
         ]);
     }

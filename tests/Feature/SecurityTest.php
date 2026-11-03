@@ -63,7 +63,9 @@ class SecurityTest extends TestCase
         $this->get('/staff')->assertRedirect('/staff/login');
         $this->get('/staff/visitors')->assertRedirect('/staff/login');
         $this->get('/staff/export')->assertRedirect('/staff/login');
-        $lead = $this->makeVisitor(true)->lead;
+        $visitor = $this->makeVisitor(true);
+        $this->delete(route('staff.visitors.message.destroy', $visitor))->assertRedirect('/staff/login');
+        $lead = $visitor->lead;
         $this->patch("/staff/leads/{$lead->id}", ['status' => 'closed'])->assertRedirect('/staff/login');
         $this->assertSame('new', $lead->fresh()->status);
     }

@@ -40,6 +40,7 @@ Route::prefix('staff')->name('staff.')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::get('/visitors', [VisitorController::class, 'index'])->name('visitors');
+        Route::delete('/visitors/{visitor}/message', [VisitorController::class, 'destroyMessage'])->name('visitors.message.destroy');
         Route::patch('/leads/{lead}', [VisitorController::class, 'updateLead'])->name('leads.update');
         Route::get('/export', [VisitorController::class, 'export'])->name('export');
     });

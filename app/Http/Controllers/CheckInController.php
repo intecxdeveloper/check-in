@@ -8,8 +8,8 @@ use App\Models\Lead;
 use App\Models\Visitor;
 use App\Support\AvatarImage;
 use App\Support\AvatarPresenter;
+use App\Support\MapCache;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -103,8 +103,7 @@ class CheckInController extends Controller
             ];
         });
 
-        Cache::forget('map:stats');
-        Cache::forget('map:companies:'.md5(json_encode([])));
+        MapCache::flushPublic();
 
         return response()->json([
             'message' => 'Welcome to the network!',

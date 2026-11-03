@@ -10,7 +10,7 @@
 @section('content')
 <h1 class="sr-only">Overview</h1>
 <dl class="grid grid-cols-3 divide-x divide-black/[0.06] overflow-hidden rounded-2xl border border-black/[0.06] bg-white">
-    @foreach ([['Check-ins', $checkIns], ['Companies', $companies], ['On the map', $publicCompanies]] as [$label, $value])
+    @foreach ([['Check-ins', $checkIns], ['On the map', $publicCompanies], ['Live messages', $liveMessages]] as [$label, $value])
         <div class="px-4 py-4 sm:px-6 sm:py-5">
             <dt class="text-xs font-semibold text-mute sm:text-sm">{{ $label }}</dt>
             <dd class="staff-num mt-1 text-2xl font-bold sm:text-4xl">{{ number_format($value) }}</dd>
@@ -22,17 +22,20 @@
     <section class="rounded-2xl border border-black/[0.06] bg-white p-5 lg:col-span-2" aria-labelledby="recent-heading">
         <div class="flex items-center justify-between gap-3">
             <h2 id="recent-heading" class="text-base font-bold">Latest check-ins</h2>
-            <a href="{{ route('staff.visitors') }}" class="text-sm font-semibold text-blue hover:underline">All visitors</a>
+            <a href="{{ route('staff.visitors', ['messages' => 1]) }}" class="text-sm font-semibold text-blue hover:underline">Review messages</a>
         </div>
         <ul class="mt-3 divide-y divide-black/[0.06]">
             @forelse ($recent as $visitor)
                 <li class="flex items-center justify-between gap-3 py-3">
                     <div class="min-w-0">
-                        <p class="truncate text-sm font-semibold">{{ $visitor->full_name }}</p>
+                        <p class="truncate text-sm font-semibold">{{ $visitor->full_name }} <span class="font-mono font-bold text-mute">{{ $visitor->claimCode() }}</span></p>
                         <p class="truncate text-xs text-mute">{{ $visitor->company?->name ?: 'No company' }} · <time datetime="{{ $visitor->created_at?->toIso8601String() }}">{{ $visitor->created_at?->diffForHumans() }}</time></p>
+                        @if ($visitor->hasPublicMessage())
+                            <p class="mt-0.5 truncate text-xs text-ink">“{{ $visitor->display_message }}”</p>
+                        @endif
                     </div>
                     @if ($visitor->lead)
-                        <span class="staff-pill" data-status="{{ $visitor->lead->status }}">{{ str_replace('-', ' ', $visitor->lead->status) }}</span>
+                        <span class="staff-pill" data-status="{{ $visitor->lead->status }}">{{ \App\Models\Lead::label($visitor->lead->status) }}</span>
                     @endif
                 </li>
             @empty
@@ -43,13 +46,17 @@
 
     <div class="space-y-6">
         <section class="rounded-2xl border border-black/[0.06] bg-white p-5">
-            <h2 class="text-base font-bold">Lead pipeline</h2>
-            <ul class="mt-3 space-y-2.5 text-sm">
-                @foreach (['new','follow-up','contacted','qualified','closed'] as $status)
+            <h2 class="text-base font-bold">NADI follow-up</h2>
+            <p class="mt-1 text-xs text-mute">How you are following up with each visitor. Not their company.</p>
+            <ul class="mt-3 space-y-3 text-sm">
+                @foreach (\App\Models\Lead::STATUSES as $status)
                     @php $count = (int) ($byStatus[$status] ?? 0); @endphp
-                    <li class="flex items-center justify-between gap-3">
-                        <span class="staff-pill" data-status="{{ $status }}">{{ str_replace('-', ' ', $status) }}</span>
-                        <span class="staff-num font-semibold">{{ $count }}</span>
+                    <li>
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="staff-pill" data-status="{{ $status }}">{{ \App\Models\Lead::label($status) }}</span>
+                            <span class="staff-num font-semibold">{{ $count }}</span>
+                        </div>
+                        <p class="mt-1 text-xs text-mute">{{ \App\Models\Lead::meaning($status) }}</p>
                     </li>
                 @endforeach
             </ul>

@@ -25,14 +25,15 @@ npm run dev
 - Staff desk: [http://127.0.0.1:8000/staff/login](http://127.0.0.1:8000/staff/login)
   - Email: `staff@expo.test`
   - Password: `password`
+  - Remove inappropriate map messages from Visitors (or Overview → Review messages)
 
-## Features (MVP)
+## Features
 
 - Full-screen MapLibre map with clustering, filters, live counters, and recent check-ins
-- 5-step check-in wizard (profile, interests, company pin, consent, success)
+- Check-in wizard (profile, interests, company pin, public message, consent, prize receipt)
 - Nominatim-backed location search with manual pin confirmation
-- Public company cards (no personal contact details)
-- Staff auth, search, lead status/notes/assignment, CSV export
+- Public company pins (no personal contact details)
+- Staff auth, search, lead pipeline, CSV export, public-message moderation
 - Rate limiting, CSRF, duplicate check-in guard, privacy notice versioning
 
 ## Config
@@ -45,9 +46,10 @@ See `config/expo.php` and `.env`:
 
 ## Deployment
 
-1. `cp .env.example .env`, then set `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://…`, `LOG_LEVEL=warning`, `SESSION_ENCRYPT=true`, and `TRUSTED_PROXIES` if behind a proxy.
+1. `cp .env.example .env`, then set `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://…`, `LOG_LEVEL=warning`, `SESSION_ENCRYPT=true`, and `TRUSTED_PROXIES=*` (or your load balancer IPs) if HTTPS terminates at a proxy.
 2. `composer install --no-dev --optimize-autoloader && npm ci && npm run build` (delete `public/hot` if present).
 3. `php artisan key:generate && php artisan migrate --force && php artisan db:seed --force` (in production the seeder only creates services; demo `@expo.test` accounts are local-only and blocked from login in production).
 4. Create staff logins: `php artisan expo:staff you@company.com --name="Your Name"` (prompts for a 12+ character password).
 5. `php artisan storage:link`, then `php artisan config:cache`, `php artisan route:cache`, `php artisan view:cache`, `php artisan event:cache`.
-6. Serve over HTTPS; health check at `/up`. Back up `database/database.sqlite` and `storage/app/public/avatars` regularly.
+6. Serve over HTTPS; health check at `/up`. Generated URLs are forced to HTTPS in production. Back up `database/database.sqlite` and `storage/app/public/avatars` regularly.
+7. Staff can take a public message off the live map from `/staff/visitors` without deleting the visitor or lead.

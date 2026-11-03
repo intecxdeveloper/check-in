@@ -1,5 +1,10 @@
 @extends('layouts.map')
 
+@section('head')
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="dns-prefetch" href="https://tiles.openfreemap.org">
+@endsection
+
 @section('content')
 <div
     id="expo-app"
@@ -20,13 +25,14 @@
             width="640"
             height="223"
             decoding="async"
+            fetchpriority="high"
         >
         <div class="aiva-greeting">
-            @include('partials.aiva', ['pose' => 'wave', 'size' => 64, 'loading' => 'eager', 'class' => 'aiva-greeting-img'])
-            <p class="aiva-bubble"><strong>Hi, I’m Aiva.</strong> I’ll walk you through it.</p>
+            @include('partials.aiva', ['pose' => 'wave', 'size' => 56, 'loading' => 'eager', 'class' => 'aiva-greeting-img'])
+            <p class="aiva-bubble"><strong>Hi, I’m Aiva.</strong> About a minute — then show your receipt at the counter.</p>
         </div>
         <h1>Join the Malaysia map</h1>
-        <p>Five quick steps, about a minute. When you’re done, show your receipt at the counter to claim a prize.</p>
+        <p>Five short steps. Your name stays private. The pin is only for the booth map.</p>
     </div>
 
     <div id="company-card" class="company-card hidden" hidden></div>
@@ -54,6 +60,13 @@
                 <span data-step-dot="4"></span>
                 <span data-step-dot="5"></span>
             </div>
+            <ol class="checkin-step-names" aria-hidden="true">
+                <li data-step-name="1">You</li>
+                <li data-step-name="2">Company</li>
+                <li data-step-name="3">Interests</li>
+                <li data-step-name="4">Place</li>
+                <li data-step-name="5">Join</li>
+            </ol>
 
             @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'showPrizeReceipt' => true, 'services' => $services])
         </div>

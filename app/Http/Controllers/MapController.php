@@ -6,6 +6,9 @@ use App\Models\Company;
 use App\Models\Service;
 use App\Models\Visitor;
 use App\Support\AvatarPresenter;
+use App\Support\MapCache;
+use DateInterval;
+use DateTimeInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -21,40 +24,101 @@ class MapController extends Controller
 
     public function index(Request $request): View
     {
+        $centroid = $this->cachedArray(MapCache::publicKey('centroid'), now()->addMinutes(2), fn () => $this->mapCentroid());
+
         return view('map.index', [
             'services' => $this->interestServices(),
             'privacyVersion' => config('expo.privacy_notice_version'),
             'checkInUrl' => $request->getSchemeAndHttpHost().route('check-in', absolute: false),
+            'mapCenterLng' => (float) ($centroid['lng'] ?? config('expo.map_center_lng')),
+            'mapCenterLat' => (float) ($centroid['lat'] ?? config('expo.map_center_lat')),
+            'viteEntry' => 'resources/js/map.js',
+            'loadMapAssets' => true,
         ]);
     }
 
     public function checkIn(): View
     {
+        $brand = config('expo.brand_name');
+
         return view('map.checkin', [
             'services' => $this->interestServices(),
             'privacyVersion' => config('expo.privacy_notice_version'),
+            'title' => $brand.' · Check in',
+            'ogTitle' => $brand.' · Check in',
+            'description' => 'Check in at the '.$brand.' booth in about a minute. Your name stays private.',
+            'viteEntry' => 'resources/js/checkin.js',
         ]);
     }
 
     /**
-     * @return Collection<int, Service>
+     * @return Collection<int, array{id:int, name:string, slug:string, color:?string}>
      */
     private function interestServices()
     {
-        if (Service::query()->doesntExist()) {
-            foreach ([
-                ['name' => 'GIS / Geospatial', 'slug' => 'gis', 'color' => '#38bdf8'],
-                ['name' => 'Land Management', 'slug' => 'land', 'color' => '#34d399'],
-                ['name' => 'Software / IT', 'slug' => 'software', 'color' => '#a78bfa'],
-                ['name' => 'Data Analytics', 'slug' => 'analytics', 'color' => '#fbbf24'],
-                ['name' => 'System Integration', 'slug' => 'integration', 'color' => '#fb7185'],
-                ['name' => 'Other', 'slug' => 'other', 'color' => '#94a3b8'],
-            ] as $service) {
-                Service::query()->create($service);
-            }
+        return once(function () {
+            $cached = $this->cachedArray('map:services', now()->addMinutes(10), function () {
+                if (Service::query()->doesntExist()) {
+                    foreach ([
+                        ['name' => 'GIS / Geospatial', 'slug' => 'gis', 'color' => '#38bdf8'],
+                        ['name' => 'Land Management', 'slug' => 'land', 'color' => '#34d399'],
+                        ['name' => 'Software / IT', 'slug' => 'software', 'color' => '#a78bfa'],
+                        ['name' => 'Data Analytics', 'slug' => 'analytics', 'color' => '#fbbf24'],
+                        ['name' => 'System Integration', 'slug' => 'integration', 'color' => '#fb7185'],
+                        ['name' => 'Other', 'slug' => 'other', 'color' => '#94a3b8'],
+                    ] as $service) {
+                        Service::query()->create($service);
+                    }
+                }
+
+                return Service::query()
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'slug', 'color'])
+                    ->map(fn (Service $service) => [
+                        'id' => $service->id,
+                        'name' => $service->name,
+                        'slug' => $service->slug,
+                        'color' => $service->color,
+                    ])
+                    ->values()
+                    ->all();
+            });
+
+            return collect($cached);
+        });
+    }
+
+    /**
+     * @param  callable(): array<string, mixed>|list<mixed>  $callback
+     * @return array<string, mixed>|list<mixed>
+     */
+    private function cachedArray(string $key, DateTimeInterface|DateInterval|int $ttl, callable $callback): array
+    {
+        $cached = Cache::get($key);
+        if (! is_array($cached)) {
+            Cache::forget($key);
+            $cached = Cache::remember($key, $ttl, $callback);
         }
 
-        return Service::query()->orderBy('name')->get(['id', 'name', 'slug', 'color']);
+        return is_array($cached) ? $cached : [];
+    }
+
+    /**
+     * @return array{lng: ?float, lat: ?float}
+     */
+    private function mapCentroid(): array
+    {
+        $row = Company::query()
+            ->where('public_display_enabled', true)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->selectRaw('AVG(longitude) as lng, AVG(latitude) as lat')
+            ->first();
+
+        return [
+            'lng' => $row?->lng !== null ? (float) $row->lng : null,
+            'lat' => $row?->lat !== null ? (float) $row->lat : null,
+        ];
     }
 
     public function companies(Request $request): JsonResponse
@@ -65,9 +129,13 @@ class MapController extends Controller
             'since' => ['nullable', 'date'],
         ]);
 
-        $cacheKey = 'map:companies:'.md5(json_encode($request->only(['service', 'region', 'since'])));
+        $cacheKey = MapCache::publicKey('companies:'.md5(json_encode($request->only(['service', 'region', 'since']))));
 
-        $payload = Cache::remember($cacheKey, now()->addSeconds(self::PUBLIC_CACHE_SECONDS), fn () => $this->buildCompaniesPayload($request));
+        $payload = Cache::flexible($cacheKey, [self::PUBLIC_CACHE_SECONDS, self::PUBLIC_CACHE_SECONDS * 4], fn () => $this->buildCompaniesPayload($request));
+        if (! $this->isFeatureCollection($payload)) {
+            Cache::forget($cacheKey);
+            $payload = $this->buildCompaniesPayload($request);
+        }
 
         return response()->json($payload)
             ->header('Cache-Control', 'public, max-age='.self::PUBLIC_CACHE_SECONDS);
@@ -99,7 +167,24 @@ class MapController extends Controller
             $query->where('updated_at', '>=', $since);
         }
 
-        $companies = $query->latest('updated_at')->limit(self::MAX_MAP_COMPANIES)->get();
+        $companies = $query
+            ->select([
+                'id',
+                'name',
+                'city',
+                'region',
+                'country',
+                'latitude',
+                'longitude',
+                'public_website',
+                'avatar_path',
+                'avatar_seed',
+                'created_at',
+                'updated_at',
+            ])
+            ->latest('updated_at')
+            ->limit(self::MAX_MAP_COMPANIES)
+            ->get();
         $companyIds = $companies->pluck('id');
 
         $latestMessages = Visitor::query()
@@ -132,14 +217,19 @@ class MapController extends Controller
 
         return [
             'type' => 'FeatureCollection',
-            'features' => $features,
+            'features' => $features->values()->all(),
             'generated_at' => now()->toIso8601String(),
         ];
     }
 
     public function stats(): JsonResponse
     {
-        $payload = Cache::remember('map:stats', now()->addSeconds(self::PUBLIC_CACHE_SECONDS), fn () => $this->buildStatsPayload());
+        $cacheKey = MapCache::publicKey('stats');
+        $payload = Cache::flexible($cacheKey, [self::PUBLIC_CACHE_SECONDS, self::PUBLIC_CACHE_SECONDS * 4], fn () => $this->buildStatsPayload());
+        if (! is_array($payload) || ! array_key_exists('check_ins', $payload)) {
+            Cache::forget($cacheKey);
+            $payload = $this->buildStatsPayload();
+        }
 
         return response()->json($payload)
             ->header('Cache-Control', 'public, max-age='.self::PUBLIC_CACHE_SECONDS);
@@ -166,7 +256,27 @@ class MapController extends Controller
 
     public function recent(): JsonResponse
     {
-        $items = Visitor::query()
+        $cacheKey = MapCache::publicKey('recent');
+        $payload = Cache::flexible($cacheKey, [self::PUBLIC_CACHE_SECONDS, self::PUBLIC_CACHE_SECONDS * 4], fn () => [
+            'items' => $this->buildRecentItems()->values()->all(),
+        ]);
+        if (! is_array($payload) || ! is_array($payload['items'] ?? null)) {
+            Cache::forget($cacheKey);
+            $payload = [
+                'items' => $this->buildRecentItems()->values()->all(),
+            ];
+        }
+
+        return response()->json($payload)
+            ->header('Cache-Control', 'public, max-age='.self::PUBLIC_CACHE_SECONDS);
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildRecentItems(): Collection
+    {
+        return Visitor::query()
             ->select(['id', 'company_id', 'full_name', 'display_message', 'avatar_path', 'avatar_seed', 'created_at'])
             ->with(['company:id,name,city,region,country,public_display_enabled,latitude,longitude'])
             ->latest()
@@ -216,8 +326,17 @@ class MapController extends Controller
                     'created_at' => $visitor->created_at?->toIso8601String(),
                 ];
             });
+    }
 
-        return response()->json(['items' => $items]);
+    /**
+     * @param  mixed  $payload
+     */
+    private function isFeatureCollection($payload): bool
+    {
+        return is_array($payload)
+            && ($payload['type'] ?? null) === 'FeatureCollection'
+            && is_array($payload['features'] ?? null)
+            && array_is_list($payload['features']);
     }
 
     public function services(): JsonResponse

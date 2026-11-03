@@ -1,6 +1,8 @@
 import { PRESET_AVATARS, avatarUrl, presetAvatarUrl } from './avatars';
+import { loadMapLibre } from './maplibre';
 
-export function createCheckInWizard({ root, maplibregl, services, onSuccess, lockOpen = false }) {
+export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services, onSuccess, lockOpen = false }) {
+    let maplibregl = loadedMapLibre;
     const modal = root.querySelector('#checkin-modal');
     const form = root.querySelector('#checkin-form');
     const errorEl = root.querySelector('#checkin-error');
@@ -87,6 +89,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         locationBanner.hidden = true;
         ensureCheckinMap();
     });
+    root.querySelector('#location-gps-btn')?.addEventListener('click', useDeviceLocation);
 
     companyInput?.addEventListener('input', () => {
         selectedCompany = null;
@@ -126,10 +129,14 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
 
     const messageInput = root.querySelector('#display-message-input') || form.querySelector('[name="display_message"]');
     const messagePreview = root.querySelector('#message-bubble-preview-text');
+    const messageCount = root.querySelector('#message-count');
     messageInput?.addEventListener('input', () => {
-        const text = messageInput.value.trim();
+        const text = messageInput.value;
         if (messagePreview) {
-            messagePreview.textContent = text || 'Your message will show here';
+            messagePreview.textContent = text.trim() || 'Your message will show here';
+        }
+        if (messageCount) {
+            messageCount.textContent = `${text.length} / 80`;
         }
     });
 
@@ -330,6 +337,11 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
             dot.classList.toggle('active', n <= Math.min(step, 5));
             dot.classList.toggle('current', n === step);
         });
+        root.querySelectorAll('[data-step-name]').forEach((el) => {
+            const n = Number(el.dataset.stepName);
+            el.classList.toggle('is-current', n === Math.min(step, 5));
+            el.classList.toggle('is-done', n < Math.min(step, 5));
+        });
         const progress = root.querySelector('.checkin-progress');
         progress?.setAttribute('aria-valuenow', String(Math.min(step, 5)));
         root.querySelector('.checkin-sheet')?.setAttribute('data-current-step', String(step));
@@ -356,6 +368,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         root.scrollTop = 0;
 
         if (step === 4) {
+            setLocationStatus('Opening the map…', 'busy');
             prepareLocationStep();
         }
     }
@@ -449,8 +462,8 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
         }
     }
 
-    function prepareLocationStep() {
-        ensureCheckinMap();
+    async function prepareLocationStep() {
+        await ensureCheckinMap();
         const lat = form.querySelector('[name="latitude"]').value;
         const lng = form.querySelector('[name="longitude"]').value;
         const hasPin = lat && lng;
@@ -469,26 +482,60 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
             if (locationHelp) {
                 locationHelp.textContent = 'We found your company’s pin. Confirm it, or search or drag to move it.';
             }
+            root.querySelector('.location-details')?.setAttribute('open', '');
         } else {
             if (locationBanner) locationBanner.hidden = true;
             if (locationHelp) {
-                locationHelp.textContent = 'Search for your office or area, or tap the map to drop your pin.';
+                locationHelp.textContent = 'Search a place, use this phone’s location, or tap the map.';
             }
         }
     }
 
-    function ensureCheckinMap() {
+    async function useDeviceLocation() {
+        if (! navigator.geolocation) {
+            setLocationStatus('This browser can’t share location. Search or tap the map.', 'warn');
+            return;
+        }
+
+        setLocationStatus('Finding you…', 'busy');
+        await ensureCheckinMap();
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setPin(position.coords.longitude, position.coords.latitude, { reverse: true, fly: true });
+                setLocationStatus('Pin placed from this phone. Drag your avatar to fine-tune.', 'ok');
+                hideError();
+            },
+            () => {
+                setLocationStatus('Location permission was declined. Search a place or tap the map.', 'warn');
+            },
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 },
+        );
+    }
+
+    async function ensureCheckinMap() {
         if (checkinMap) {
             checkinMap.resize();
             syncPinPreview();
             return;
         }
-        if (! maplibregl) {
+
+        let gl = maplibregl;
+        if (! gl) {
+            try {
+                gl = await loadMapLibre();
+                maplibregl = gl;
+            } catch (_) {
+                gl = null;
+            }
+        }
+
+        if (! gl) {
             showError('Map is taking a break — enter a city if you can, or try again in a moment.');
             return;
         }
 
-        checkinMap = new maplibregl.Map({
+        checkinMap = new gl.Map({
             container: 'checkin-map',
             style: root.dataset.mapStyle,
             center: [101.9758, 4.2105],
@@ -496,7 +543,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
             attributionControl: false,
         });
 
-        checkinMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+        checkinMap.addControl(new gl.NavigationControl({ showCompass: false }), 'top-right');
         checkinMap.on('style.load', () => {
             try { checkinMap.setProjection({ type: 'mercator' }); } catch (_) {}
         });
@@ -509,6 +556,7 @@ export function createCheckInWizard({ root, maplibregl, services, onSuccess, loc
             const lng = form.querySelector('[name="longitude"]').value;
             if (lat && lng) setPin(Number(lng), Number(lat), { reverse: false, fly: true });
             syncPinPreview();
+            setLocationStatus('');
         });
     }
 
