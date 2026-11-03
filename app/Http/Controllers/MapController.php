@@ -24,12 +24,16 @@ class MapController extends Controller
 
     public function index(Request $request): View
     {
+        if ($this->isCheckInHost($request)) {
+            return $this->checkIn();
+        }
+
         $centroid = $this->cachedArray(MapCache::publicKey('centroid'), now()->addMinutes(2), fn () => $this->mapCentroid());
 
         return view('map.index', [
             'services' => $this->interestServices(),
             'privacyVersion' => config('expo.privacy_notice_version'),
-            'checkInUrl' => $request->getSchemeAndHttpHost().route('check-in', absolute: false),
+            'checkInUrl' => $this->checkInPublicUrl($request),
             'mapCenterLng' => (float) ($centroid['lng'] ?? config('expo.map_center_lng')),
             'mapCenterLat' => (float) ($centroid['lat'] ?? config('expo.map_center_lat')),
             'viteEntry' => 'resources/js/map.js',
@@ -338,6 +342,26 @@ class MapController extends Controller
             && ($payload['type'] ?? null) === 'FeatureCollection'
             && is_array($payload['features'] ?? null)
             && array_is_list($payload['features']);
+    }
+
+    private function checkInPublicUrl(?Request $request = null): string
+    {
+        $configured = trim((string) config('expo.check_in_url'));
+
+        if ($configured !== '') {
+            return rtrim($configured, '/');
+        }
+
+        $request ??= request();
+
+        return $request->getSchemeAndHttpHost().route('check-in', absolute: false);
+    }
+
+    private function isCheckInHost(Request $request): bool
+    {
+        $host = parse_url($this->checkInPublicUrl($request), PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' && strcasecmp($request->getHost(), $host) === 0;
     }
 
     public function services(): JsonResponse

@@ -18,7 +18,7 @@
     data-services='@json($services)'
     data-check-in-url="{{ $checkInUrl }}"
 >
-    <a class="skip-link" href="{{ route('check-in') }}">Skip to check-in</a>
+    <a class="skip-link" href="{{ $checkInUrl }}">Skip to check-in</a>
 
     <div id="map" class="expo-map" role="application" aria-label="Live visitor map of Malaysia"></div>
     <div class="expo-vignette" aria-hidden="true"></div>
@@ -71,7 +71,7 @@
         <div id="service-filters" class="hidden" hidden></div>
     </div>
 
-    <a class="expo-mobile-cta" href="{{ route('check-in') }}">Check in on this phone</a>
+    <a class="expo-mobile-cta" href="{{ $checkInUrl }}">Check in on this phone</a>
 
     <div id="company-card" class="company-card hidden" role="dialog" aria-modal="true" aria-labelledby="company-card-title">
         <button type="button" id="company-card-close" class="company-card-close" aria-label="Close">×</button>

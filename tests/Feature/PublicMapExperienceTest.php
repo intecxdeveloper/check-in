@@ -49,11 +49,21 @@ class PublicMapExperienceTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Skip to check-in', false)
+            ->assertSee('https://scan.nadispatial.com', false)
             ->assertSee('class="expo-pulse', false)
             ->assertSee('id="recent-list"', false)
             ->assertSee('Just joined', false)
             ->assertSee('Check in on this phone', false)
             ->assertSee('maplibre-gl.js', false);
+    }
+
+    public function test_scan_host_opens_check_in_at_the_root(): void
+    {
+        $this->get('https://scan.nadispatial.com/')
+            ->assertOk()
+            ->assertSee('Join the Malaysia map', false)
+            ->assertSee('id="prize-receipt"', false)
+            ->assertDontSee('maplibre-gl.js', false);
     }
 
     public function test_check_in_page_skips_the_booth_map_bundle(): void

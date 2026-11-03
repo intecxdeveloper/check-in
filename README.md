@@ -42,6 +42,7 @@ See `config/expo.php` and `.env`:
 
 - `EXPO_MAP_STYLE` — MapLibre style URL (default OpenFreeMap dark)
 - `EXPO_PRIVACY_VERSION` — privacy notice version stored with each visitor
+- `EXPO_CHECK_IN_URL` — public check-in URL encoded in the booth QR (default `https://scan.nadispatial.com`)
 - `EXPO_GEOCODER_USER_AGENT` — required Nominatim User-Agent
 
 ## Deployment
