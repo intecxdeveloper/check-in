@@ -17,4 +17,13 @@ class Service extends Model
     {
         return $this->belongsToMany(Company::class);
     }
+
+    public function labelFor(?string $otherInterest): string
+    {
+        if ($this->slug === 'other' && filled($otherInterest)) {
+            return $otherInterest;
+        }
+
+        return $this->name;
+    }
 }

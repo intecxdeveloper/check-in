@@ -31,7 +31,8 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     let reverseTimer = null;
     let selectedCompany = null;
     let uploadedObjectUrl = null;
-    let uploadedFile = null;
+    let uploadedDataUrl = null;
+    let compressPromise = null;
     let selectedPreset = PRESET_AVATARS[0];
 
     renderInterestOptions(services);
@@ -91,6 +92,58 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     });
     root.querySelector('#location-gps-btn')?.addEventListener('click', useDeviceLocation);
 
+    const mapStage = root.querySelector('#checkin-map-stage');
+    const mapFullscreenBtn = root.querySelector('#checkin-map-fullscreen');
+    const mapDoneBtn = root.querySelector('#checkin-map-done');
+    const mapStageAnchor = document.createComment('checkin-map-stage');
+    mapStage?.parentNode?.insertBefore(mapStageAnchor, mapStage);
+
+    function isMapExpanded() {
+        return Boolean(mapStage?.classList.contains('is-expanded'));
+    }
+
+    function setMapExpanded(expanded) {
+        if (! mapStage) {
+            return;
+        }
+
+        mapStage.classList.toggle('is-expanded', expanded);
+        document.documentElement.classList.toggle('checkin-map-is-expanded', expanded);
+        document.body.classList.toggle('checkin-map-is-expanded', expanded);
+        mapFullscreenBtn?.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+        if (mapFullscreenBtn) {
+            mapFullscreenBtn.textContent = expanded ? 'Exit full screen' : 'Full screen';
+        }
+
+        if (expanded) {
+            document.body.appendChild(mapStage);
+        } else if (mapStageAnchor.parentNode) {
+            mapStageAnchor.parentNode.insertBefore(mapStage, mapStageAnchor.nextSibling);
+        }
+
+        requestAnimationFrame(() => {
+            checkinMap?.resize();
+            if (expanded) {
+                locationQuery?.focus({ preventScroll: true });
+            }
+        });
+    }
+
+    mapFullscreenBtn?.addEventListener('click', () => {
+        const next = ! isMapExpanded();
+        setMapExpanded(next);
+        if (next) {
+            ensureCheckinMap();
+        }
+    });
+    mapDoneBtn?.addEventListener('click', () => setMapExpanded(false));
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && isMapExpanded()) {
+            event.preventDefault();
+            setMapExpanded(false);
+        }
+    });
+
     companyInput?.addEventListener('input', () => {
         selectedCompany = null;
         clearTimeout(companySearchTimer);
@@ -112,14 +165,31 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     avatarFileInput?.addEventListener('change', () => {
         const file = avatarFileInput.files?.[0];
         if (! file) return;
+        hideError();
         if (uploadedObjectUrl) URL.revokeObjectURL(uploadedObjectUrl);
-        uploadedFile = file;
         uploadedObjectUrl = URL.createObjectURL(file);
+        uploadedDataUrl = null;
         avatarPreview.src = uploadedObjectUrl;
-        avatarPreviewLabel.textContent = 'Your upload · face or logo';
+        avatarPreviewLabel.textContent = 'Preparing photo…';
         avatarSeedInput.value = '';
         avatarClearBtn?.classList.remove('hidden');
         avatarPresets?.querySelectorAll('.avatar-preset').forEach((el) => el.classList.remove('active'));
+        compressPromise = prepareAvatarUpload(file)
+            .then((dataUrl) => {
+                uploadedDataUrl = dataUrl;
+                avatarPreview.src = dataUrl;
+                avatarPreviewLabel.textContent = 'Your upload · face or logo';
+                if (uploadedObjectUrl) {
+                    URL.revokeObjectURL(uploadedObjectUrl);
+                    uploadedObjectUrl = null;
+                }
+                syncPinPreview();
+            })
+            .catch((error) => {
+                clearUpload();
+                setPresetAvatar(selectedPreset || PRESET_AVATARS[0]);
+                showError(error?.message || 'Please upload a JPG, PNG or WebP photo.');
+            });
     });
 
     avatarClearBtn?.addEventListener('click', () => {
@@ -175,6 +245,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
 
     function close() {
         if (lockOpen && step === 6) return;
+        setMapExpanded(false);
         modal.classList.add('hidden');
         destroyMap();
     }
@@ -193,12 +264,14 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         setPresetAvatar(PRESET_AVATARS[0]);
         form.querySelector('[name="country"]').value = 'Malaysia';
         form.querySelector('[name="public_display_enabled"]').checked = true;
+        syncOtherInterestField();
         hideError();
         submitting = false;
         nextBtn.disabled = false;
         form.querySelector('[name="latitude"]').value = '';
         form.querySelector('[name="longitude"]').value = '';
         if (locationBanner) locationBanner.hidden = true;
+        setMapExpanded(false);
         destroyMap();
     }
 
@@ -213,7 +286,8 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     function clearUpload() {
         if (uploadedObjectUrl) URL.revokeObjectURL(uploadedObjectUrl);
         uploadedObjectUrl = null;
-        uploadedFile = null;
+        uploadedDataUrl = null;
+        compressPromise = null;
         if (avatarFileInput) avatarFileInput.value = '';
         avatarClearBtn?.classList.add('hidden');
     }
@@ -226,7 +300,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         interestOptions.innerHTML = list.map((service) => {
             const color = escapeHtml(service.color || '#0058b8');
             return `
-                <div class="interest-chip" style="--interest-color:${color}">
+                <div class="interest-chip" data-slug="${escapeHtml(service.slug || '')}" style="--interest-color:${color}">
                     <input type="checkbox" name="services[]" value="${escapeHtml(String(service.id))}" aria-label="${escapeHtml(service.name)}">
                     <span class="interest-option-swatch" aria-hidden="true"></span>
                     <span class="interest-option-label">${escapeHtml(service.name)}</span>
@@ -236,6 +310,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
 
         bindInterestChips();
         root.querySelector('#interest-empty-hint')?.remove();
+        syncOtherInterestField();
     }
 
     function bindInterestChips() {
@@ -250,6 +325,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             }
             if (event.target.matches('input[type="checkbox"]')) {
                 chip.classList.toggle('is-selected', event.target.checked);
+                syncOtherInterestField({ focus: chip.dataset.slug === 'other' && event.target.checked });
                 return;
             }
             const input = chip.querySelector('input[type="checkbox"]');
@@ -258,7 +334,38 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             }
             input.checked = ! input.checked;
             chip.classList.toggle('is-selected', input.checked);
+            syncOtherInterestField({ focus: chip.dataset.slug === 'other' && input.checked });
         });
+    }
+
+    function otherInterestWrap() {
+        return root.querySelector('#other-interest-wrap');
+    }
+
+    function otherInterestInput() {
+        return form.querySelector('[name="other_interest"]');
+    }
+
+    function otherInterestSelected() {
+        return Boolean(interestOptions?.querySelector('.interest-chip[data-slug="other"] input:checked'));
+    }
+
+    function syncOtherInterestField({ focus = false } = {}) {
+        const wrap = otherInterestWrap();
+        const input = otherInterestInput();
+        const selected = otherInterestSelected();
+
+        wrap?.classList.toggle('hidden', ! selected);
+        if (! selected && input) {
+            input.value = '';
+            input.removeAttribute('required');
+        } else if (input) {
+            input.setAttribute('required', 'required');
+        }
+
+        if (focus && selected) {
+            input?.focus({ preventScroll: true });
+        }
     }
 
     async function ensureInterestOptions() {
@@ -370,6 +477,8 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         if (step === 4) {
             setLocationStatus('Opening the map…', 'busy');
             prepareLocationStep();
+        } else {
+            setMapExpanded(false);
         }
     }
 
@@ -561,6 +670,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     }
 
     function currentAvatarSrc() {
+        if (uploadedDataUrl) return uploadedDataUrl;
         if (uploadedObjectUrl) return uploadedObjectUrl;
         return avatarUrl(avatarSeedInput.value || form.full_name?.value || 'friend', 96);
     }
@@ -748,6 +858,10 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
                 showError('Choose at least one topic you’d like to hear about.');
                 return false;
             }
+            if (otherInterestSelected() && ! otherInterestInput()?.value.trim()) {
+                showError('Type the interest you have in mind.', otherInterestInput());
+                return false;
+            }
             return true;
         }
         if (current === 4) {
@@ -773,35 +887,49 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         nextBtn.disabled = true;
         nextBtn.textContent = 'Joining…';
 
-        const serviceIds = [...form.querySelectorAll('input[name="services[]"]:checked')].map((el) => el.value);
-        const body = new FormData();
-        body.append('full_name', form.full_name.value.trim());
-        body.append('job_title', form.job_title.value.trim());
-        body.append('email', form.email.value.trim());
-        body.append('phone', form.phone.value.trim());
-        body.append('company_name', form.company_name.value.trim());
-        body.append('address_text', form.address_text.value.trim());
-        body.append('city', form.city.value.trim());
-        body.append('region', form.region.value.trim());
-        body.append('country', form.country.value.trim() || 'Malaysia');
-        body.append('latitude', form.latitude.value);
-        body.append('longitude', form.longitude.value);
-        body.append('public_website', form.public_website.value.trim());
-        body.append('display_message', form.display_message?.value.trim() || '');
-        body.append('public_display_enabled', form.public_display_enabled.checked ? '1' : '0');
-        body.append('follow_up_consent', form.follow_up_consent.checked ? '1' : '0');
-        body.append('privacy_accepted', form.privacy_accepted.checked ? '1' : '0');
-        body.append('services', serviceIds.join(','));
-        if (uploadedFile) {
-            body.append('avatar', uploadedFile);
+        if (compressPromise) {
+            try {
+                await compressPromise;
+            } catch (error) {
+                showError(error?.message || 'Please upload a JPG, PNG or WebP photo.');
+                nextBtn.disabled = false;
+                nextBtn.textContent = stepCopy[5].next;
+                submitting = false;
+                return;
+            }
+        }
+
+        const serviceIds = [...form.querySelectorAll('input[name="services[]"]:checked')].map((el) => Number(el.value));
+        const body = {
+            full_name: form.full_name.value.trim(),
+            job_title: form.job_title.value.trim(),
+            email: form.email.value.trim(),
+            phone: form.phone.value.trim(),
+            company_name: form.company_name.value.trim(),
+            address_text: form.address_text.value.trim(),
+            city: form.city.value.trim(),
+            region: form.region.value.trim(),
+            country: form.country.value.trim() || 'Malaysia',
+            latitude: form.latitude.value,
+            longitude: form.longitude.value,
+            public_website: form.public_website.value.trim(),
+            display_message: form.display_message?.value.trim() || '',
+            public_display_enabled: form.public_display_enabled.checked,
+            follow_up_consent: form.follow_up_consent.checked,
+            privacy_accepted: form.privacy_accepted.checked,
+            services: serviceIds,
+            other_interest: otherInterestSelected() ? (otherInterestInput()?.value.trim() || '') : '',
+        };
+        if (uploadedDataUrl) {
+            body.avatar = uploadedDataUrl;
         } else {
-            body.append('avatar_seed', avatarSeedInput.value || form.full_name.value.trim() || 'friend');
+            body.avatar_seed = avatarSeedInput.value || form.full_name.value.trim() || 'friend';
         }
 
         try {
             const result = await window.expoFetch('/api/check-in', {
                 method: 'POST',
-                body,
+                body: JSON.stringify(body),
             });
 
             const successAvatar = root.querySelector('#success-avatar');
@@ -891,4 +1019,77 @@ function escapeHtml(value) {
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;');
+}
+
+const AVATAR_MAX_EDGE = 640;
+const AVATAR_MAX_SOURCE_BYTES = 6 * 1024 * 1024;
+const AVATAR_MAX_DATA_URL_CHARS = 1_400_000;
+const AVATAR_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+async function prepareAvatarUpload(file) {
+    if (! AVATAR_ALLOWED_TYPES.includes(file.type)) {
+        throw new Error('Please upload a JPG, PNG or WebP photo.');
+    }
+    if (file.size > AVATAR_MAX_SOURCE_BYTES) {
+        throw new Error('Keep uploads under 6MB — a phone photo is perfect.');
+    }
+
+    const image = await loadImageSource(file);
+    const width = image.width;
+    const height = image.height;
+    const scale = Math.min(1, AVATAR_MAX_EDGE / Math.max(width, height));
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const context = canvas.getContext('2d', { alpha: file.type === 'image/png' });
+    if (! context) {
+        throw new Error('Please upload a JPG, PNG or WebP photo.');
+    }
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+    image.close?.();
+
+    const preferPng = file.type === 'image/png';
+    let dataUrl = canvas.toDataURL(preferPng ? 'image/png' : 'image/webp', 0.82);
+    if (! dataUrl.startsWith('data:image/')) {
+        dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+    }
+
+    let quality = 0.82;
+    while (dataUrl.length > AVATAR_MAX_DATA_URL_CHARS && quality > 0.45) {
+        quality -= 0.12;
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+    }
+
+    if (dataUrl.length > AVATAR_MAX_DATA_URL_CHARS) {
+        throw new Error('Keep uploads under 6MB — a phone photo is perfect.');
+    }
+
+    return dataUrl;
+}
+
+function loadImageSource(file) {
+    if (typeof createImageBitmap === 'function') {
+        return createImageBitmap(file).catch(() => loadImageElement(file));
+    }
+
+    return loadImageElement(file);
+}
+
+function loadImageElement(file) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(image);
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Please upload a JPG, PNG or WebP photo.'));
+        };
+        image.src = url;
+    });
 }

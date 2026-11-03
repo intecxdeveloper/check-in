@@ -14,12 +14,12 @@
 
                 <div class="avatar-upload-row">
                     <label class="avatar-upload-btn">
-                        <input id="avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" hidden>
+                        <input id="avatar-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
                         <span>Upload photo / logo</span>
                     </label>
                     <button type="button" id="avatar-clear-upload" class="avatar-clear-btn hidden">Use preset</button>
                 </div>
-                <p class="checkin-help">Phone photos and logos are welcome. Keep it friendly for a public screen.</p>
+                <p class="checkin-help">Phone photos and logos are welcome. We shrink them before sending so the booth Wi-Fi stays happy.</p>
             </div>
         </div>
 
@@ -58,40 +58,55 @@
         <p class="checkin-help">What are you into? Tap as many as you like — no wrong answers.</p>
         <div id="interest-options" class="interest-grid" role="group" aria-label="Interests">
             @foreach (collect($services ?? []) as $service)
-                <div class="interest-chip" style="--interest-color: {{ data_get($service, 'color') ?: '#0058b8' }}">
+                <div class="interest-chip" data-slug="{{ data_get($service, 'slug') }}" style="--interest-color: {{ data_get($service, 'color') ?: '#0058b8' }}">
                     <input type="checkbox" name="services[]" value="{{ data_get($service, 'id') }}" aria-label="{{ data_get($service, 'name') }}">
                     <span class="interest-option-swatch" aria-hidden="true"></span>
                     <span class="interest-option-label">{{ data_get($service, 'name') }}</span>
                 </div>
             @endforeach
         </div>
+        <label id="other-interest-wrap" class="hidden">
+            What should we call it?
+            <input id="other-interest-input" type="text" name="other_interest" maxlength="80" autocomplete="off" placeholder="Type anything — hydrography, drones, CAD…">
+        </label>
         @if (collect($services ?? [])->isEmpty())
             <p class="checkin-help" id="interest-empty-hint">Interests are loading… if this stays blank, refresh once.</p>
         @endif
     </section>
 
     <section data-step="4" class="checkin-step hidden">
-        <p class="checkin-help" id="location-help">Search a place, use this phone’s location, or tap the map.</p>
+        <p class="checkin-help" id="location-help">Search a place, use this phone’s location, or open the map full screen to find your office.</p>
         <div class="location-banner" id="location-banner" hidden>
             <strong id="location-banner-title">Location ready</strong>
             <p id="location-banner-copy"></p>
             <button type="button" id="location-adjust-btn" class="btn-secondary">Adjust on map</button>
         </div>
-        <div class="location-search" id="location-search" role="search">
-            <label for="location-query" class="sr-only">Search for a place in Malaysia</label>
-            <span class="location-search-icon" aria-hidden="true"></span>
-            <input id="location-query" type="search" inputmode="search" enterkeyhint="search" placeholder="Search a place, e.g. Mid Valley, Penang" autocomplete="off"
-                role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="location-results">
-            <button type="button" id="location-search-btn">Search</button>
+        <div id="checkin-map-stage" class="checkin-map-stage">
+            <div class="checkin-map-stage-bar">
+                <p class="checkin-map-stage-label">Office map</p>
+                <button type="button" id="checkin-map-fullscreen" class="checkin-map-fullscreen-btn" aria-pressed="false" aria-controls="checkin-map">
+                    Full screen
+                </button>
+            </div>
+            <div class="location-search" id="location-search" role="search">
+                <label for="location-query" class="sr-only">Search for a place in Malaysia</label>
+                <span class="location-search-icon" aria-hidden="true"></span>
+                <input id="location-query" type="search" inputmode="search" enterkeyhint="search" placeholder="Search a place, e.g. Mid Valley, Penang" autocomplete="off"
+                    role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="location-results">
+                <button type="button" id="location-search-btn">Search</button>
+            </div>
+            <button type="button" id="location-gps-btn" class="location-gps-btn">Use my location</button>
+            <div class="location-status-row">
+                @include('partials.aiva', ['pose' => 'work', 'size' => 34, 'class' => 'aiva-status'])
+                <p id="location-status" class="location-status" role="status" aria-live="polite" hidden></p>
+            </div>
+            <ul id="location-results" class="location-results" role="listbox" aria-label="Matching places" hidden></ul>
+            <div id="checkin-map" class="checkin-map" role="application" aria-label="Map to place your office"></div>
+            <p class="checkin-help">Can’t find it? Tap the map near your area, then drag your avatar to the exact spot.</p>
+            <div class="checkin-map-stage-done">
+                <button type="button" id="checkin-map-done" class="btn-primary">Use this pin</button>
+            </div>
         </div>
-        <button type="button" id="location-gps-btn" class="location-gps-btn">Use my location</button>
-        <div class="location-status-row">
-            @include('partials.aiva', ['pose' => 'work', 'size' => 34, 'class' => 'aiva-status'])
-            <p id="location-status" class="location-status" role="status" aria-live="polite" hidden></p>
-        </div>
-        <ul id="location-results" class="location-results" role="listbox" aria-label="Matching places" hidden></ul>
-        <div id="checkin-map" class="checkin-map"></div>
-        <p class="checkin-help">Can’t find it? Tap the map near your area, then drag your avatar to the exact spot.</p>
         <details class="location-details">
             <summary>Fine-tune city and state</summary>
             <div class="checkin-grid">
@@ -128,7 +143,7 @@
                 type="text"
                 name="display_message"
                 maxlength="80"
-                placeholder="Hello from Penang!"
+                placeholder="What say you? Hello from KL!"
                 autocomplete="off"
                 aria-describedby="message-count"
             >

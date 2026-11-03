@@ -62,6 +62,7 @@ class CheckInController extends Controller
                 'email' => $data['email'] ?? null,
                 'phone' => $data['phone'] ?? null,
                 'display_message' => $message !== '' ? $message : null,
+                'other_interest' => $data['other_interest'] ?? null,
                 'avatar_seed' => $avatarPath ? null : $avatarSeed,
                 'avatar_path' => $avatarPath,
                 'company_id' => $company->id,
@@ -134,6 +135,7 @@ class CheckInController extends Controller
             'longitude' => $data['longitude'],
             'public_display_enabled' => (bool) $data['public_display_enabled'],
             'public_website' => $data['public_website'] ?? null,
+            'other_interest' => $data['other_interest'] ?? null,
         ];
 
         if ($avatarPath) {

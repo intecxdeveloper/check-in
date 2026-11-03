@@ -122,6 +122,27 @@ class SecurityTest extends TestCase
         $this->assertLessThanOrEqual(320, $width);
     }
 
+    public function test_avatar_base64_upload_is_reencoded_and_rejects_non_images(): void
+    {
+        Storage::fake('public');
+
+        $this->postJson('/api/check-in', $this->checkInPayload([
+            'avatar' => 'data:image/jpeg;base64,'.base64_encode('<?php echo 1;'),
+        ]))->assertUnprocessable()->assertJsonValidationErrors('avatar');
+
+        $file = UploadedFile::fake()->image('me.jpg', 1600, 1200);
+        $dataUri = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($file->getRealPath()));
+
+        $this->postJson('/api/check-in', $this->checkInPayload([
+            'avatar' => $dataUri,
+        ]))->assertCreated();
+
+        $path = Visitor::latest('id')->first()->avatar_path;
+        $this->assertStringEndsWith('.webp', $path);
+        [$width] = getimagesizefromstring(Storage::disk('public')->get($path));
+        $this->assertLessThanOrEqual(320, $width);
+    }
+
     public function test_check_in_ignores_mass_assignment_fields(): void
     {
         $this->postJson('/api/check-in', $this->checkInPayload([

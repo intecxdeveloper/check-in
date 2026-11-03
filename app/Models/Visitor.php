@@ -16,6 +16,7 @@ class Visitor extends Model
         'email',
         'phone',
         'display_message',
+        'other_interest',
         'display_message_removed_at',
         'avatar_seed',
         'avatar_path',

@@ -19,6 +19,7 @@ class Company extends Model
         'longitude',
         'public_display_enabled',
         'public_website',
+        'other_interest',
         'avatar_seed',
         'avatar_path',
     ];
@@ -53,7 +54,7 @@ class Company extends Model
     {
         // MapLibre clustering requires primitive GeoJSON properties only.
         $services = $this->services->map(fn (Service $s) => [
-            'name' => $s->name,
+            'name' => $s->labelFor($this->other_interest),
             'slug' => $s->slug,
             'color' => $s->color,
         ])->values()->all();

@@ -177,6 +177,7 @@ class MapController extends Controller
                 'latitude',
                 'longitude',
                 'public_website',
+                'other_interest',
                 'avatar_path',
                 'avatar_seed',
                 'created_at',

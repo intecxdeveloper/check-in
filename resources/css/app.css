@@ -1339,11 +1339,95 @@
 }
 
 .checkin-map {
-    height: 230px;
+    height: 280px;
     margin-top: 0.85rem;
     border-radius: 1.2rem;
     overflow: hidden;
     border: 1px solid var(--color-line);
+}
+
+.checkin-map-stage-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.85rem;
+}
+
+.checkin-map-stage-label {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-mute);
+}
+
+.checkin-map-fullscreen-btn {
+    min-height: 44px;
+    padding: 0 0.95rem;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--color-ink);
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.checkin-map-stage-done {
+    display: none;
+}
+
+.checkin-map-stage.is-expanded {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: max(0.75rem, env(safe-area-inset-top)) 0.85rem max(0.85rem, env(safe-area-inset-bottom));
+    background: #fff;
+    isolation: isolate;
+}
+
+.checkin-map-stage.is-expanded .checkin-map {
+    flex: 1 1 auto;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    margin-top: 0.65rem;
+}
+
+.checkin-map-stage.is-expanded .checkin-map-stage-done {
+    display: block;
+    margin-top: 0.75rem;
+}
+
+.checkin-map-stage.is-expanded .checkin-map-stage-done .btn-primary {
+    width: 100%;
+}
+
+html.checkin-map-is-expanded,
+body.checkin-map-is-expanded {
+    overflow: hidden;
+}
+
+body.checkin-map-is-expanded .checkin-only,
+body.checkin-map-is-expanded .checkin-sheet,
+body.checkin-map-is-expanded .checkin-modal,
+body.checkin-map-is-expanded .checkin-modal-page {
+    overflow: visible !important;
+    transform: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+}
+
+body.checkin-map-is-expanded .checkin-actions {
+    visibility: hidden;
 }
 
 .consent-card {
@@ -1749,7 +1833,11 @@
 .location-status[data-tone="ok"] { color: #1f7a37; }
 .location-status[data-tone="warn"] { color: #8a5300; }
 .location-status[data-tone="error"] { padding: 0.65rem 0.8rem; border-radius: 0.75rem; background: rgba(255, 149, 0, 0.1); color: #8a5300; }
-.checkin-sheet .checkin-map { margin-top: 0.75rem; border-radius: 1rem; border: 1px solid var(--ck-line); min-height: 260px; }
+.checkin-sheet .checkin-map { margin-top: 0.75rem; border-radius: 1rem; border: 1px solid var(--ck-line); min-height: 280px; height: min(42vh, 22rem); }
+.checkin-sheet .checkin-map-stage-bar { margin-top: 1rem; }
+.checkin-sheet .checkin-map-fullscreen-btn { border-color: var(--ck-line); background: var(--ck-soft, #f4f6fa); color: var(--ck-ink); }
+.checkin-map-stage.is-expanded .checkin-map,
+.checkin-sheet .checkin-map-stage.is-expanded .checkin-map { min-height: 0; height: auto; flex: 1 1 auto; }
 .checkin-sheet .location-banner { border-radius: 1rem; background: rgba(52, 199, 89, 0.08); border: 1px solid rgba(52, 199, 89, 0.22); box-shadow: none; }
 
 /* Interests */
@@ -1766,6 +1854,7 @@
 .checkin-sheet .interest-chip:has(input:focus-visible) { outline: 3px solid rgba(0, 88, 184, 0.4); outline-offset: 2px; }
 .checkin-sheet .interest-option-swatch { width: 0.6rem; height: 0.6rem; border-radius: 999px; background: var(--interest-color, var(--ck-accent)); flex: none; }
 .checkin-sheet .interest-option-label { color: var(--ck-ink); font-weight: 600; }
+.checkin-sheet #other-interest-wrap { margin-top: 0.75rem; }
 
 /* Review + consent */
 .checkin-sheet .consent-card { border-radius: 1rem; background: var(--ck-soft); border: 1px solid var(--ck-line); padding: 0.9rem 1rem; box-shadow: none; }

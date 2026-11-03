@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Lead;
+use App\Models\Service;
 use App\Models\Visitor;
 use App\Support\MapCache;
 use Illuminate\Database\Eloquent\Builder;
@@ -100,7 +101,9 @@ class VisitorController extends Controller
                             $visitor->company?->city,
                             $visitor->company?->region,
                             $visitor->company?->country,
-                            $visitor->company?->services->pluck('name')->implode('; '),
+                            $visitor->company?->services
+                                ->map(fn (Service $service) => $service->labelFor($visitor->other_interest))
+                                ->implode('; '),
                             $visitor->company?->public_display_enabled ? 'yes' : 'no',
                             $visitor->display_message,
                             $visitor->follow_up_consent_at ? 'yes' : 'no',
@@ -155,6 +158,7 @@ class VisitorController extends Controller
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%")
                         ->orWhere('display_message', 'like', "%{$search}%")
+                        ->orWhere('other_interest', 'like', "%{$search}%")
                         ->orWhereHas('company', fn (Builder $c) => $c->where('name', 'like', "%{$search}%"));
                 });
             })

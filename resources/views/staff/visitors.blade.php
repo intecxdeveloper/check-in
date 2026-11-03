@@ -82,7 +82,7 @@
                         <ul class="mt-3 flex flex-wrap gap-1.5" aria-label="Interests">
                             @foreach ($visitor->company->services as $service)
                                 <li class="rounded-full px-2.5 py-1 text-xs font-semibold"
-                                    style="background: {{ $service->color }}24">{{ $service->name }}</li>
+                                    style="background: {{ $service->color }}24">{{ $service->labelFor($visitor->other_interest) }}</li>
                             @endforeach
                         </ul>
                     @endif
