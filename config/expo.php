@@ -28,4 +28,15 @@ return [
     // OpenCorporates needs a token (free tier). Without it, search uses local directory only.
     'company_search_opencorporates' => env('EXPO_COMPANY_SEARCH_OPENCORPORATES', true),
     'opencorporates_api_token' => env('OPENCORPORATES_API_TOKEN'),
+
+    'gift_prizes' => [
+        ['key' => 'tote', 'label' => 'NADI tote bag', 'short' => 'Tote', 'color' => '#00254e', 'weight' => 1],
+        ['key' => 'tumbler', 'label' => 'NADI tumbler', 'short' => 'Tumbler', 'color' => '#c8141e', 'weight' => 1],
+        ['key' => 'stickers', 'label' => 'Sticker pack', 'short' => 'Stickers', 'color' => '#0058b8', 'weight' => 1],
+        ['key' => 'pin', 'label' => 'Aiva pin', 'short' => 'Pin', 'color' => '#0a3566', 'weight' => 1],
+        ['key' => 'notebook', 'label' => 'Field notebook', 'short' => 'Notebook', 'color' => '#c8141e', 'weight' => 1],
+        ['key' => 'lanyard', 'label' => 'NADI lanyard', 'short' => 'Lanyard', 'color' => '#0078e0', 'weight' => 1],
+        ['key' => 'cap', 'label' => 'NADI cap', 'short' => 'Cap', 'color' => '#00254e', 'weight' => 1],
+        ['key' => 'mystery', 'label' => 'Mystery gift', 'short' => 'Mystery', 'color' => '#c8141e', 'weight' => 1],
+    ],
 ];

@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Service;
 use App\Models\Visitor;
 use App\Support\AvatarPresenter;
+use App\Support\GiftWheel;
 use App\Support\MapCache;
 use DateInterval;
 use DateTimeInterface;
@@ -30,6 +31,7 @@ class MapController extends Controller
             'services' => $this->interestServices(),
             'privacyVersion' => config('expo.privacy_notice_version'),
             'checkInUrl' => $request->getSchemeAndHttpHost().route('check-in', absolute: false),
+            'giftPrizes' => GiftWheel::prizes(),
             'mapCenterLng' => (float) ($centroid['lng'] ?? config('expo.map_center_lng')),
             'mapCenterLat' => (float) ($centroid['lat'] ?? config('expo.map_center_lat')),
             'viteEntry' => 'resources/js/map.js',

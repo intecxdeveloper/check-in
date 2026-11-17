@@ -55,6 +55,7 @@
                     </p>
                     <dl class="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
                         <div><dt class="text-xs font-semibold text-mute">Claim code</dt><dd class="font-mono font-bold tracking-wide">{{ $visitor->claimCode() }}</dd></div>
+                        <div><dt class="text-xs font-semibold text-mute">Gift</dt><dd>{{ $visitor->giftPrizeLabel() ?: 'Not spun yet' }}</dd></div>
                         <div><dt class="text-xs font-semibold text-mute">Consent</dt><dd>{{ $visitor->company?->public_display_enabled ? 'Shown on map' : 'Hidden from map' }} · {{ $visitor->follow_up_consent_at ? 'Follow-up OK' : 'No follow-up' }}</dd></div>
                         <div><dt class="text-xs font-semibold text-mute">Email</dt><dd class="break-all">@if ($visitor->email)<a class="hover:underline" href="mailto:{{ $visitor->email }}">{{ $visitor->email }}</a>@else — @endif</dd></div>
                         <div><dt class="text-xs font-semibold text-mute">Phone</dt><dd>@if ($visitor->phone)<a class="hover:underline" href="tel:{{ preg_replace('/[^0-9+]/', '', $visitor->phone) }}">{{ $visitor->phone }}</a>@else — @endif</dd></div>
@@ -68,7 +69,7 @@
                                           onsubmit="return confirm('Remove this message from the public map? The visitor record stays.')">
                                         @csrf
                                         @method('DELETE')
-                                        <button class="text-sm font-semibold text-[#c41e3a] hover:underline">Remove from map</button>
+                                        <button class="text-sm font-semibold text-[#c41e3a] hover:underline">Hide message</button>
                                     </form>
                                 @elseif ($visitor->display_message_removed_at)
                                     <span class="text-mute">Removed from the map {{ $visitor->display_message_removed_at->diffForHumans() }}</span>
@@ -108,6 +109,12 @@
                         <button class="min-h-10 w-full rounded-lg bg-navy px-4 text-sm font-semibold text-white hover:bg-navy-2 sm:w-auto">Save follow-up</button>
                     </form>
                 @endif
+                <form method="POST" action="{{ route('staff.visitors.destroy', $visitor) }}" class="lg:col-span-2"
+                      onsubmit="return confirm('Delete this visitor from the desk and the live map? This cannot be undone.')">
+                    @csrf
+                    @method('DELETE')
+                    <button class="text-sm font-semibold text-[#c41e3a] hover:underline">Delete visitor</button>
+                </form>
             </div>
         </article>
     @empty

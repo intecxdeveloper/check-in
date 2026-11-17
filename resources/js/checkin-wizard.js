@@ -939,6 +939,14 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
                     || currentAvatarSrc();
             }
 
+            if (result.claim_code) {
+                try {
+                    sessionStorage.setItem('expo-claim-code', result.claim_code);
+                } catch {
+                    // Private mode can block sessionStorage.
+                }
+            }
+
             if (hasPrizeReceipt()) {
                 root.querySelector('#success-title').textContent = 'You’re in!';
                 root.querySelector('#success-copy').textContent = 'Keep this receipt open and show it at the counter to claim your prize.';

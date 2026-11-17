@@ -17,6 +17,8 @@
     data-privacy-version="{{ $privacyVersion }}"
     data-services='@json($services)'
     data-check-in-url="{{ $checkInUrl }}"
+    data-gift-prizes='@json($giftPrizes)'
+    data-gift-spin-url="{{ route('api.gift-spin') }}"
 >
     <a class="skip-link" href="{{ route('check-in') }}">Skip to check-in</a>
 
@@ -67,11 +69,15 @@
             <p class="expo-qr-caption">Scan to check in</p>
             <a id="checkin-qr-link" class="expo-qr-link" href="{{ $checkInUrl }}">Open on this phone</a>
             <button type="button" id="checkin-open" class="expo-cta">Check in here</button>
+            <button type="button" id="gift-open" class="expo-gift-open">Spin for a gift</button>
         </aside>
         <div id="service-filters" class="hidden" hidden></div>
     </div>
 
-    <a class="expo-mobile-cta" href="{{ route('check-in') }}">Check in on this phone</a>
+    <div class="expo-mobile-actions">
+        <a class="expo-mobile-cta" href="{{ route('check-in') }}">Check in</a>
+        <button type="button" id="gift-open-mobile" class="expo-mobile-gift">Gift wheel</button>
+    </div>
 
     <div id="company-card" class="company-card hidden" role="dialog" aria-modal="true" aria-labelledby="company-card-title">
         <button type="button" id="company-card-close" class="company-card-close" aria-label="Close">×</button>
@@ -91,6 +97,35 @@
     <canvas id="join-fireworks" class="join-fireworks hidden" aria-hidden="true"></canvas>
     <div id="checkin-toast" class="join-toast hidden" role="status" aria-live="assertive"></div>
     <div id="map-fallback" class="map-fallback hidden"></div>
+
+    <div id="gift-modal" class="gift-modal hidden" role="dialog" aria-modal="true" aria-labelledby="gift-title">
+        <div class="gift-sheet">
+            <div class="gift-header">
+                <div>
+                    <p class="gift-eyebrow">Booth gift</p>
+                    <h2 id="gift-title">Spin the NADI wheel</h2>
+                </div>
+                <button type="button" id="gift-close" class="checkin-close" aria-label="Close gift wheel">×</button>
+            </div>
+            <p class="gift-help">Type the claim code from check-in, then spin once for a booth gift.</p>
+            <form id="gift-form" class="gift-form">
+                <label class="gift-code-label" for="gift-claim-code">Claim code</label>
+                <input id="gift-claim-code" name="claim_code" type="text" inputmode="text" autocomplete="off" maxlength="12" placeholder="CK-0001" required>
+                <div class="gift-stage">
+                    <div class="gift-pointer" aria-hidden="true"></div>
+                    <div id="gift-wheel" class="gift-wheel" aria-hidden="true"></div>
+                    <span class="gift-hub" aria-hidden="true"></span>
+                </div>
+                <p id="gift-status" class="gift-status" role="status"></p>
+                <button type="submit" id="gift-spin" class="expo-cta">Spin</button>
+            </form>
+            <div id="gift-result" class="gift-result hidden" role="status">
+                <p class="gift-result-kicker" id="gift-result-kicker">You won</p>
+                <p class="gift-result-prize" id="gift-result-prize"></p>
+                <p class="gift-result-copy" id="gift-result-copy">Show this screen at the counter to collect it.</p>
+            </div>
+        </div>
+    </div>
 
     <div id="checkin-modal" class="checkin-modal hidden" role="dialog" aria-modal="true" aria-labelledby="checkin-title">
         <div class="checkin-sheet">

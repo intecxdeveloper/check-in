@@ -52,7 +52,10 @@ class PublicMapExperienceTest extends TestCase
             ->assertSee('class="expo-pulse', false)
             ->assertSee('id="recent-list"', false)
             ->assertSee('Just joined', false)
-            ->assertSee('Check in on this phone', false)
+            ->assertSee('class="expo-mobile-cta"', false)
+            ->assertSee('Gift wheel', false)
+            ->assertSee('Spin for a gift', false)
+            ->assertSee('id="gift-modal"', false)
             ->assertSee('maplibre-gl.js', false);
     }
 

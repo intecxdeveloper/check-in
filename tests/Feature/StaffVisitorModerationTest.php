@@ -79,7 +79,8 @@ class StaffVisitorModerationTest extends TestCase
             ->get(route('staff.visitors'))
             ->assertOk()
             ->assertSee('Hello from the booth', false)
-            ->assertSee('Remove from map', false)
+            ->assertSee('Hide message', false)
+            ->assertSee('Delete visitor', false)
             ->assertSee($visitor->claimCode(), false);
     }
 
@@ -120,6 +121,78 @@ class StaffVisitorModerationTest extends TestCase
         $this->assertStringContainsString($visitor->claimCode(), $csv);
         $this->assertStringContainsString("'=cmd|calc", $csv);
         $this->assertStringContainsString('Public Message', $csv);
+    }
+
+    public function test_guest_cannot_delete_a_visitor(): void
+    {
+        $visitor = $this->makeVisitorWithMessage();
+
+        $this->delete(route('staff.visitors.destroy', $visitor))
+            ->assertRedirect('/staff/login');
+
+        $this->assertModelExists($visitor);
+    }
+
+    public function test_staff_can_delete_a_visitor_and_their_map_pin(): void
+    {
+        $visitor = $this->makeVisitorWithMessage();
+        $company = $visitor->company;
+        $lead = $visitor->lead;
+
+        $this->getJson(route('api.map.companies'))->assertOk()
+            ->assertJsonPath('features.0.properties.name', 'Open Maps Sdn Bhd');
+
+        $this->actingAs(User::factory()->create())
+            ->from(route('staff.visitors'))
+            ->delete(route('staff.visitors.destroy', $visitor))
+            ->assertRedirect(route('staff.visitors'))
+            ->assertSessionHas('status', 'Visitor deleted from the desk and the live map.');
+
+        $this->assertModelMissing($visitor);
+        $this->assertModelMissing($company);
+        $this->assertModelMissing($lead);
+
+        $this->getJson(route('api.map.companies'))->assertOk()
+            ->assertJsonPath('features', []);
+        $this->getJson(route('api.map.recent'))->assertOk()
+            ->assertJsonPath('items', []);
+    }
+
+    public function test_deleting_a_visitor_keeps_a_shared_company_on_the_map(): void
+    {
+        $visitor = $this->makeVisitorWithMessage();
+        $company = $visitor->company;
+        $colleague = Visitor::query()->create([
+            'full_name' => 'Rina Colleague',
+            'email' => 'rina@example.com',
+            'company_id' => $company->id,
+            'privacy_notice_version' => '1.0',
+        ]);
+        Lead::query()->create(['visitor_id' => $colleague->id, 'status' => 'new']);
+
+        $this->actingAs(User::factory()->create())
+            ->delete(route('staff.visitors.destroy', $visitor))
+            ->assertRedirect();
+
+        $this->assertModelMissing($visitor);
+        $this->assertModelExists($company);
+        $this->assertModelExists($colleague);
+
+        $this->getJson(route('api.map.companies'))->assertOk()
+            ->assertJsonPath('features.0.properties.name', 'Open Maps Sdn Bhd')
+            ->assertJsonPath('features.0.properties.message', '');
+    }
+
+    public function test_deleting_a_visitor_bumps_the_public_map_cache(): void
+    {
+        $before = MapCache::version();
+        $visitor = $this->makeVisitorWithMessage();
+
+        $this->actingAs(User::factory()->create())
+            ->delete(route('staff.visitors.destroy', $visitor))
+            ->assertRedirect();
+
+        $this->assertSame($before + 1, MapCache::version());
     }
 
     public function test_removing_a_message_bumps_the_public_map_cache(): void

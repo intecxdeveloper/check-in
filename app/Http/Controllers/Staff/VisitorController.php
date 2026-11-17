@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Models\Lead;
 use App\Models\Service;
 use App\Models\Visitor;
@@ -10,6 +11,8 @@ use App\Support\MapCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -43,6 +46,37 @@ class VisitorController extends Controller
         $lead->update($data);
 
         return back()->with('status', 'Follow-up saved.');
+    }
+
+    public function destroy(Visitor $visitor): RedirectResponse
+    {
+        $visitor->load('company');
+        $company = $visitor->company;
+        $visitorAvatar = $visitor->avatar_path;
+        $companyAvatar = $company?->avatar_path;
+        $companyId = $company?->id;
+
+        DB::transaction(function () use ($visitor, $company): void {
+            $visitor->delete();
+
+            if ($company !== null && $company->visitors()->doesntExist()) {
+                $company->delete();
+            }
+        });
+
+        $companyGone = $companyId !== null && Company::query()->whereKey($companyId)->doesntExist();
+
+        if ($companyGone || $visitorAvatar !== $companyAvatar) {
+            $this->forgetAvatar($visitorAvatar);
+        }
+
+        if ($companyGone) {
+            $this->forgetAvatar($companyAvatar);
+        }
+
+        MapCache::flushPublic();
+
+        return back()->with('status', 'Visitor deleted from the desk and the live map.');
     }
 
     public function destroyMessage(Visitor $visitor): RedirectResponse
@@ -80,6 +114,7 @@ class VisitorController extends Controller
                 'Interests',
                 'On Map',
                 'Public Message',
+                'Gift',
                 'Follow-up Consent',
                 'Lead Status',
                 'Staff Notes',
@@ -106,6 +141,7 @@ class VisitorController extends Controller
                                 ->implode('; '),
                             $visitor->company?->public_display_enabled ? 'yes' : 'no',
                             $visitor->display_message,
+                            $visitor->giftPrizeLabel(),
                             $visitor->follow_up_consent_at ? 'yes' : 'no',
                             $visitor->lead?->status,
                             $visitor->lead?->staff_notes,
@@ -119,6 +155,15 @@ class VisitorController extends Controller
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Cache-Control' => 'no-store, private',
         ]);
+    }
+
+    private function forgetAvatar(?string $path): void
+    {
+        if (! filled($path)) {
+            return;
+        }
+
+        Storage::disk('public')->delete($path);
     }
 
     /**

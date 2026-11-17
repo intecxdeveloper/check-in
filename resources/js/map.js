@@ -1,5 +1,6 @@
 import './bootstrap';
 import { createExpoMap } from './expo-map';
+import { createGiftWheel } from './gift-wheel';
 
 const root = document.getElementById('expo-app');
 
@@ -12,4 +13,5 @@ if (root) {
     }
 
     createExpoMap(root, maplibregl);
+    createGiftWheel(root);
 }

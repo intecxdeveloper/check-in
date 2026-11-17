@@ -27,6 +27,7 @@
                 <nav class="staff-nav -mx-1 flex items-center gap-1 overflow-x-auto text-sm font-semibold" aria-label="Staff">
                     <a href="{{ route('staff.dashboard') }}" @if (request()->routeIs('staff.dashboard')) aria-current="page" @endif class="rounded-full px-3 py-1.5 hover:bg-black/[0.05]">Overview</a>
                     <a href="{{ route('staff.visitors') }}" @if (request()->routeIs('staff.visitors')) aria-current="page" @endif class="rounded-full px-3 py-1.5 hover:bg-black/[0.05]">Visitors</a>
+                    <a href="{{ route('staff.gifts') }}" @if (request()->routeIs('staff.gifts*')) aria-current="page" @endif class="rounded-full px-3 py-1.5 hover:bg-black/[0.05]">Gifts</a>
                     <a href="{{ route('map') }}" target="_blank" rel="noopener" class="rounded-full px-3 py-1.5 hover:bg-black/[0.05]">Live map <span aria-hidden="true">↗</span><span class="sr-only">(opens in new tab)</span></a>
                     <form method="POST" action="{{ route('staff.logout') }}" class="ml-1">
                         @csrf

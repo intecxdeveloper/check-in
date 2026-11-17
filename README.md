@@ -26,11 +26,13 @@ npm run dev
   - Email: `nadi@expo.local`
   - Password: `password`
   - Local demo only: `staff@expo.test` / `password` (blocked in production)
-  - Remove inappropriate map messages from Visitors (or Overview → Review messages)
+  - Hide an inappropriate map message, or delete the visitor to take them off the map (Visitors, or Overview → Review messages)
+  - Gift from the map wheel shows on the visitor record after they spin with their claim code
+  - Add or edit wheel prizes from Staff → Gifts, then reload the live map
 
 ## Features
 
-- Full-screen MapLibre map with clustering, filters, live counters, and recent check-ins
+- Full-screen MapLibre map with clustering, filters, live counters, recent check-ins, and a booth gift wheel
 - Check-in wizard (profile, interests, company pin, public message, consent, prize receipt)
 - Nominatim-backed location search with manual pin confirmation
 - Public company pins (no personal contact details)
@@ -53,4 +55,4 @@ See `config/expo.php` and `.env`:
 4. Add another staff login: `php artisan expo:staff you@company.com --name="Your Name"` (prompts for a 12+ character password).
 5. `php artisan storage:link`, then `php artisan config:cache`, `php artisan route:cache`, `php artisan view:cache`, `php artisan event:cache`.
 6. Serve over HTTPS; health check at `/up`. Generated URLs are forced to HTTPS in production. Back up `database/database.sqlite` and `storage/app/public/avatars` regularly.
-7. Staff can take a public message off the live map from `/staff/visitors` without deleting the visitor or lead.
+7. Staff can hide a public message from `/staff/visitors`, or delete the visitor to take them off the live map.

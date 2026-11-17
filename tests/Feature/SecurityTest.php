@@ -63,9 +63,11 @@ class SecurityTest extends TestCase
     {
         $this->get('/staff')->assertRedirect('/staff/login');
         $this->get('/staff/visitors')->assertRedirect('/staff/login');
+        $this->get('/staff/gifts')->assertRedirect('/staff/login');
         $this->get('/staff/export')->assertRedirect('/staff/login');
         $visitor = $this->makeVisitor(true);
         $this->delete(route('staff.visitors.message.destroy', $visitor))->assertRedirect('/staff/login');
+        $this->delete(route('staff.visitors.destroy', $visitor))->assertRedirect('/staff/login');
         $lead = $visitor->lead;
         $this->patch("/staff/leads/{$lead->id}", ['status' => 'closed'])->assertRedirect('/staff/login');
         $this->assertSame('new', $lead->fresh()->status);
@@ -207,6 +209,7 @@ class SecurityTest extends TestCase
 
         $this->assertDatabaseMissing('users', ['email' => 'staff@expo.test']);
         $this->assertDatabaseHas('services', ['slug' => 'gis']);
+        $this->assertDatabaseHas('gifts', ['key' => 'tote', 'label' => 'NADI tote bag']);
 
         $staff = User::query()->where('email', 'nadi@expo.local')->first();
         $this->assertNotNull($staff);
