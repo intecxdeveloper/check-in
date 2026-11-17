@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Visitor;
+use App\Support\GiftMasterKey;
 use App\Support\GiftWheel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,16 @@ class GiftSpinController extends Controller
         $data = $request->validate([
             'claim_code' => ['required', 'string', 'max:20'],
         ]);
+
+        if (GiftMasterKey::matches($data['claim_code'])) {
+            return response()->json([
+                'already_spun' => false,
+                'master_spin' => true,
+                'prize' => GiftWheel::pick(),
+                'first_name' => null,
+                'claim_code' => null,
+            ]);
+        }
 
         $visitor = Visitor::findByClaimCode($data['claim_code']);
         if ($visitor === null) {

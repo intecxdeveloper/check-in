@@ -50,7 +50,7 @@
         <ul id="company-results" class="location-results company-suggest" hidden></ul>
         <p id="company-pick-hint" class="checkin-help">Tip: picking a listed company can auto-place you on the map.</p>
         <label>Website <span>optional</span>
-            <input type="url" name="public_website" placeholder="https://" maxlength="255">
+            <input type="text" name="public_website" inputmode="url" autocomplete="url" placeholder="company.com" maxlength="255">
         </label>
     </section>
 

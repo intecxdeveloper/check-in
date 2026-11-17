@@ -29,6 +29,9 @@ return [
     'company_search_opencorporates' => env('EXPO_COMPANY_SEARCH_OPENCORPORATES', true),
     'opencorporates_api_token' => env('OPENCORPORATES_API_TOKEN'),
 
+    // Staff override for the live map wheel. Keep this off the public page.
+    'gift_master_key' => env('EXPO_GIFT_MASTER_KEY', 'NADI-SPIN'),
+
     'gift_prizes' => [
         ['key' => 'tote', 'label' => 'NADI tote bag', 'short' => 'Tote', 'color' => '#00254e', 'weight' => 1],
         ['key' => 'tumbler', 'label' => 'NADI tumbler', 'short' => 'Tumbler', 'color' => '#c8141e', 'weight' => 1],

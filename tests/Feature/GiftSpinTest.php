@@ -60,6 +60,45 @@ class GiftSpinTest extends TestCase
             ->assertJsonPath('message', 'That claim code is not on the desk. Check the receipt and try again.');
     }
 
+    public function test_master_key_spin_returns_a_prize_without_attaching_a_visitor(): void
+    {
+        $keys = array_column(GiftWheel::prizes(), 'key');
+
+        $first = $this->postJson(route('api.gift-spin'), ['claim_code' => 'NADI-SPIN']);
+        $second = $this->postJson(route('api.gift-spin'), ['claim_code' => 'nadi-spin']);
+
+        $first->assertOk()
+            ->assertJsonPath('already_spun', false)
+            ->assertJsonPath('master_spin', true)
+            ->assertJsonPath('claim_code', null);
+
+        $second->assertOk()->assertJsonPath('master_spin', true);
+
+        $this->assertTrue(in_array($first->json('prize.key'), $keys, true));
+        $this->assertSame(0, Visitor::query()->whereNotNull('gift_prize')->count());
+    }
+
+    public function test_repeated_master_key_spins_can_land_on_different_gifts(): void
+    {
+        $keys = [];
+
+        for ($i = 0; $i < 24; $i++) {
+            $response = $this->postJson(route('api.gift-spin'), ['claim_code' => 'NADI-SPIN']);
+            $response->assertOk()->assertJsonPath('master_spin', true);
+            $keys[] = $response->json('prize.key');
+        }
+
+        $this->assertGreaterThan(1, count(array_unique($keys)));
+    }
+
+    public function test_live_map_does_not_print_the_gift_master_key(): void
+    {
+        $this->get(route('map'))
+            ->assertOk()
+            ->assertDontSee('NADI-SPIN', false)
+            ->assertDontSee('gift_master_key', false);
+    }
+
     public function test_spin_assigns_a_configured_gift_to_the_visitor(): void
     {
         $visitor = $this->makeVisitor();

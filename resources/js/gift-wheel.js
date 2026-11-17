@@ -126,8 +126,12 @@ export function createGiftWheel(root) {
                 throw new Error('The wheel did not land on a gift.');
             }
 
-            storeGiftClaimCode(payload.claim_code || claimCode);
-            await animateTo(prize.index);
+            if (! payload.master_spin) {
+                storeGiftClaimCode(payload.claim_code || claimCode);
+            }
+            const index = prizeIndex(prize);
+            await animateTo(index);
+            markWinner(index);
             showResult(payload);
         } catch (error) {
             setStatus(error.message || 'The wheel did not spin. Try again.', true);
@@ -137,10 +141,28 @@ export function createGiftWheel(root) {
         }
     }
 
+    function prizeIndex(prize) {
+        const fromKey = prizes.findIndex((item) => item.key === prize.key);
+        if (fromKey >= 0) {
+            return fromKey;
+        }
+
+        const fromApi = Number(prize.index);
+
+        return Number.isFinite(fromApi) ? fromApi : 0;
+    }
+
+    function markWinner(index) {
+        wheel.querySelectorAll('.gift-wheel-label').forEach((label, labelIndex) => {
+            label.classList.toggle('is-winner', labelIndex === index);
+        });
+    }
+
     function animateTo(index) {
         const slice = 360 / prizes.length;
-        const landing = (360 - (index * slice)) % 360;
-        const extraTurns = reduceMotion ? 0 : 6;
+        const jitter = reduceMotion ? 0 : (Math.random() - 0.5) * slice * 0.3;
+        const landing = (360 - ((index * slice) + jitter) + 360) % 360;
+        const extraTurns = reduceMotion ? 0 : 6 + Math.floor(Math.random() * 3);
         currentTurns = (Math.floor(currentTurns / 360) + extraTurns) * 360 + landing;
         wheel.classList.toggle('is-spinning', ! reduceMotion);
         wheel.style.transform = `rotate(${currentTurns}deg)`;
@@ -173,14 +195,21 @@ export function createGiftWheel(root) {
             prizeEl.textContent = prize.label;
         }
         if (copy) {
-            copy.textContent = payload.already_spun
-                ? 'This claim code already has a gift. Show it at the counter.'
-                : 'Show this screen at the counter to collect it.';
+            if (payload.already_spun) {
+                copy.textContent = 'This claim code already has a gift. Show it at the counter.';
+            } else if (payload.master_spin) {
+                copy.textContent = 'Staff master spin — collect at the counter. This did not attach to a visitor.';
+            } else {
+                copy.textContent = 'Show this screen at the counter to collect it.';
+            }
         }
         resultEl?.classList.remove('hidden');
         setStatus('');
         spinButton.textContent = payload.already_spun ? 'Show gift' : 'Spin';
-        resultEl?.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+        root.querySelector('.gift-stage')?.scrollIntoView({
+            block: 'center',
+            behavior: reduceMotion ? 'auto' : 'smooth',
+        });
     }
 
     return { open };

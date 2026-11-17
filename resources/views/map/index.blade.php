@@ -107,10 +107,10 @@
                 </div>
                 <button type="button" id="gift-close" class="checkin-close" aria-label="Close gift wheel">×</button>
             </div>
-            <p class="gift-help">Type the claim code from check-in, then spin once for a booth gift.</p>
+            <p class="gift-help">Type the claim code from check-in, then spin once for a booth gift. Staff can type the master key from Gifts if a receipt is missing.</p>
             <form id="gift-form" class="gift-form">
                 <label class="gift-code-label" for="gift-claim-code">Claim code</label>
-                <input id="gift-claim-code" name="claim_code" type="text" inputmode="text" autocomplete="off" maxlength="12" placeholder="CK-0001" required>
+                <input id="gift-claim-code" name="claim_code" type="text" inputmode="text" autocomplete="off" maxlength="20" placeholder="CK-0001" required>
                 <div class="gift-stage">
                     <div class="gift-pointer" aria-hidden="true"></div>
                     <div id="gift-wheel" class="gift-wheel" aria-hidden="true"></div>

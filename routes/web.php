@@ -47,6 +47,7 @@ Route::prefix('staff')->name('staff.')->group(function () {
         Route::get('/gifts', [GiftController::class, 'index'])->name('gifts');
         Route::post('/gifts', [GiftController::class, 'store'])->name('gifts.store');
         Route::post('/gifts/starter', [GiftController::class, 'loadStarter'])->name('gifts.starter');
+        Route::patch('/gifts/master-key', [GiftController::class, 'updateMasterKey'])->name('gifts.master-key');
         Route::patch('/gifts/{gift}', [GiftController::class, 'update'])->name('gifts.update');
         Route::delete('/gifts/{gift}', [GiftController::class, 'destroy'])->name('gifts.destroy');
         Route::get('/visitors', [VisitorController::class, 'index'])->name('visitors');

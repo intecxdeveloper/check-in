@@ -33,9 +33,7 @@ class StoreCheckInRequest extends FormRequest
             'avatar_seed' => filled($this->input('avatar_seed'))
                 ? trim((string) $this->input('avatar_seed'))
                 : null,
-            'public_website' => filled($this->input('public_website'))
-                ? trim((string) $this->input('public_website'))
-                : null,
+            'public_website' => $this->normalizedPublicWebsite($this->input('public_website')),
             'job_title' => filled($this->input('job_title')) ? trim((string) $this->input('job_title')) : null,
             'email' => filled($this->input('email')) ? trim((string) $this->input('email')) : null,
             'phone' => filled($this->input('phone')) ? trim((string) $this->input('phone')) : null,
@@ -106,6 +104,7 @@ class StoreCheckInRequest extends FormRequest
             'avatar.image' => 'Please upload a photo or logo image.',
             'avatar.max' => 'Keep uploads under 6MB — a phone photo is perfect.',
             'avatar.mimes' => 'Please upload a JPG, PNG or WebP photo.',
+            'public_website.url' => 'Add a website like company.com or https://company.com — or leave it blank.',
         ];
     }
 
@@ -123,6 +122,28 @@ class StoreCheckInRequest extends FormRequest
         $ids = array_map('intval', $serviceIds ?? $this->input('services', []));
 
         return in_array((int) $otherId, $ids, true);
+    }
+
+    private function normalizedPublicWebsite(mixed $value): ?string
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return null;
+        }
+
+        $website = trim((string) $value);
+        if ($website === '') {
+            return null;
+        }
+
+        if (preg_match('/^[a-z][a-z0-9+.-]*:/i', $website) === 1) {
+            return $website;
+        }
+
+        if (str_starts_with($website, '//')) {
+            return 'https:'.$website;
+        }
+
+        return 'https://'.$website;
     }
 
     private function toBool(mixed $value, bool $default): bool

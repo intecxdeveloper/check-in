@@ -19,6 +19,9 @@ class StaffGiftTest extends TestCase
             'short' => 'Mug',
             'color' => '#00254e',
         ])->assertRedirect('/staff/login');
+        $this->patch(route('staff.gifts.master-key'), [
+            'master_key' => 'BOOTH-KEY',
+        ])->assertRedirect('/staff/login');
     }
 
     public function test_staff_gifts_page_shows_the_add_form(): void
@@ -27,7 +30,42 @@ class StaffGiftTest extends TestCase
             ->get(route('staff.gifts'))
             ->assertOk()
             ->assertSee('Add a gift', false)
-            ->assertSee('Load starter gifts', false);
+            ->assertSee('Load starter gifts', false)
+            ->assertSee('Master spin key', false)
+            ->assertSee('NADI-SPIN', false);
+    }
+
+    public function test_staff_can_save_a_gift_master_key_and_spin_with_it(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->from(route('staff.gifts'))
+            ->patch(route('staff.gifts.master-key'), [
+                'master_key' => 'booth-key',
+            ])
+            ->assertRedirect(route('staff.gifts'))
+            ->assertSessionHas('status');
+
+        $this->get(route('staff.gifts'))
+            ->assertOk()
+            ->assertSee('BOOTH-KEY', false);
+
+        $this->postJson(route('api.gift-spin'), ['claim_code' => 'BOOTH-KEY'])
+            ->assertOk()
+            ->assertJsonPath('master_spin', true);
+
+        $this->postJson(route('api.gift-spin'), ['claim_code' => 'NADI-SPIN'])
+            ->assertNotFound();
+    }
+
+    public function test_staff_cannot_save_a_visitor_claim_code_as_the_master_key(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->from(route('staff.gifts'))
+            ->patch(route('staff.gifts.master-key'), [
+                'master_key' => 'CK-0001',
+            ])
+            ->assertRedirect(route('staff.gifts'))
+            ->assertSessionHasErrors('master_key');
     }
 
     public function test_staff_can_add_a_gift_to_the_wheel(): void

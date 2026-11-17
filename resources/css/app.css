@@ -2151,7 +2151,9 @@ body.checkin-map-is-expanded .checkin-actions {
     position: relative;
     width: min(18.5rem, 78vw);
     height: min(18.5rem, 78vw);
-    margin: 0.35rem auto 0.2rem;
+    margin: 0.85rem auto 0.35rem;
+    padding-top: 0.35rem;
+    overflow: visible;
 }
 
 .gift-wheel {
@@ -2184,6 +2186,11 @@ body.checkin-map-is-expanded .checkin-actions {
     text-align: center;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
     transform-origin: 50% 50%;
+}
+
+.gift-wheel-label.is-winner {
+    color: #ffe08a;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.45);
 }
 
 .gift-pointer {

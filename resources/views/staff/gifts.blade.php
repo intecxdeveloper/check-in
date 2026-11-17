@@ -17,6 +17,24 @@
     @endif
 </div>
 
+<form method="POST" action="{{ route('staff.gifts.master-key') }}" class="mb-6 rounded-2xl border border-black/[0.06] bg-white p-5">
+    @csrf
+    @method('PATCH')
+    <h2 class="text-base font-bold text-navy">Master spin key</h2>
+    <p class="mt-1 max-w-xl text-sm text-mute">One staff code for the live map wheel when a visitor has no receipt. It can be used more than once and does not attach a prize to a visitor.</p>
+    <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label class="block grow text-xs font-semibold text-mute">
+            Key
+            <input type="text" name="master_key" value="{{ old('master_key', $giftMasterKey) }}" required minlength="4" maxlength="20" autocomplete="off" spellcheck="false"
+                   class="mt-1 min-h-11 w-full rounded-xl border border-black/10 bg-white px-3.5 font-mono text-base font-semibold uppercase tracking-wide text-ink sm:text-sm">
+        </label>
+        <button class="min-h-11 rounded-xl bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-2">Save key</button>
+    </div>
+    @error('master_key')
+        <p class="mt-2 text-sm font-semibold text-[#c41e3a]">{{ $message }}</p>
+    @enderror
+</form>
+
 <form method="POST" action="{{ route('staff.gifts.store') }}" class="mb-6 rounded-2xl border border-black/[0.06] bg-white p-5">
     @csrf
     <h2 class="text-base font-bold text-navy">Add a gift</h2>

@@ -851,6 +851,11 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
                 showError('Add your company — pick one from the list or type it in.', form.company_name);
                 return false;
             }
+            const website = form.public_website.value.trim();
+            if (website && ! isHttpWebsite(website)) {
+                showError('Add a website like company.com or https://company.com — or leave it blank.', form.public_website);
+                return false;
+            }
             return true;
         }
         if (current === 3) {
@@ -912,7 +917,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             country: form.country.value.trim() || 'Malaysia',
             latitude: form.latitude.value,
             longitude: form.longitude.value,
-            public_website: form.public_website.value.trim(),
+            public_website: normalizeWebsite(form.public_website.value),
             display_message: form.display_message?.value.trim() || '',
             public_display_enabled: form.public_display_enabled.checked,
             follow_up_consent: form.follow_up_consent.checked,
@@ -1019,6 +1024,31 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     });
 
     return { open, close };
+}
+
+function normalizeWebsite(value) {
+    const website = String(value ?? '').trim();
+    if (! website) {
+        return '';
+    }
+    if (/^[a-z][a-z0-9+.-]*:/i.test(website)) {
+        return website;
+    }
+    if (website.startsWith('//')) {
+        return `https:${website}`;
+    }
+
+    return `https://${website}`;
+}
+
+function isHttpWebsite(value) {
+    try {
+        const url = new URL(normalizeWebsite(value));
+
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
 }
 
 function escapeHtml(value) {

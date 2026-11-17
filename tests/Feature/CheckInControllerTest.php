@@ -7,6 +7,7 @@ use App\Models\Service;
 use App\Models\User;
 use App\Models\Visitor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class CheckInControllerTest extends TestCase
@@ -81,6 +82,35 @@ class CheckInControllerTest extends TestCase
         $this->assertSame(0, Visitor::query()->count());
     }
 
+    #[TestWith(['petronas.com', 'https://petronas.com'])]
+    #[TestWith(['www.petronas.com.my', 'https://www.petronas.com.my'])]
+    #[TestWith(['https://www.petronas.com.my', 'https://www.petronas.com.my'])]
+    #[TestWith(['http://example.com', 'http://example.com'])]
+    public function test_check_in_stores_company_website_when_https_is_omitted(string $input, string $stored): void
+    {
+        $this->postJson('/api/check-in', $this->payload([
+            'services' => [$this->gisService()->id],
+            'public_website' => $input,
+        ]))->assertCreated();
+
+        $this->assertSame($stored, Company::query()->latest('id')->first()->public_website);
+    }
+
+    public function test_check_in_returns_422_when_website_is_not_a_url(): void
+    {
+        $this->postJson('/api/check-in', $this->payload([
+            'services' => [$this->gisService()->id],
+            'public_website' => 'not a website',
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonPath(
+                'errors.public_website.0',
+                'Add a website like company.com or https://company.com — or leave it blank.',
+            );
+
+        $this->assertSame(0, Visitor::query()->count());
+    }
+
     public function test_check_in_page_includes_other_interest_field(): void
     {
         $this->get(route('check-in'))
@@ -124,6 +154,14 @@ class CheckInControllerTest extends TestCase
         return Service::query()->firstOrCreate(
             ['slug' => 'other'],
             ['name' => 'Other', 'color' => '#94a3b8'],
+        );
+    }
+
+    private function gisService(): Service
+    {
+        return Service::query()->firstOrCreate(
+            ['slug' => 'gis'],
+            ['name' => 'GIS', 'color' => '#38bdf8'],
         );
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Gift;
+use App\Support\GiftMasterKey;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -16,7 +17,33 @@ class GiftController extends Controller
         return view('staff.gifts', [
             'gifts' => Gift::query()->orderBy('sort_order')->orderBy('id')->get(),
             'nextColor' => Gift::nextColor(),
+            'giftMasterKey' => GiftMasterKey::current(),
         ]);
+    }
+
+    public function updateMasterKey(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'master_key' => [
+                'required',
+                'string',
+                'min:4',
+                'max:20',
+                'regex:/^[A-Za-z0-9-]+$/',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $normalized = GiftMasterKey::normalize((string) $value);
+                    if (preg_match('/^CK-?\d+$/', $normalized) === 1) {
+                        $fail('Use a staff key, not a visitor claim code like CK-0001.');
+                    }
+                },
+            ],
+        ], [
+            'master_key.regex' => 'Use letters, numbers, and dashes only.',
+        ]);
+
+        GiftMasterKey::put($data['master_key']);
+
+        return back()->with('status', 'Master spin key saved. Type it on the live map wheel if a visitor has no receipt.');
     }
 
     public function store(Request $request): RedirectResponse
