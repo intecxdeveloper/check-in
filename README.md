@@ -23,8 +23,9 @@ npm run dev
 
 - Public map: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 - Staff desk: [http://127.0.0.1:8000/staff/login](http://127.0.0.1:8000/staff/login)
-  - Email: `staff@expo.test`
+  - Email: `nadi@expo.local`
   - Password: `password`
+  - Local demo only: `staff@expo.test` / `password` (blocked in production)
   - Remove inappropriate map messages from Visitors (or Overview → Review messages)
 
 ## Features
@@ -48,8 +49,8 @@ See `config/expo.php` and `.env`:
 
 1. `cp .env.example .env`, then set `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://…`, `LOG_LEVEL=warning`, `SESSION_ENCRYPT=true`, and `TRUSTED_PROXIES=*` (or your load balancer IPs) if HTTPS terminates at a proxy.
 2. `composer install --no-dev --optimize-autoloader && npm ci && npm run build` (delete `public/hot` if present).
-3. `php artisan key:generate && php artisan migrate --force && php artisan db:seed --force` (in production the seeder only creates services; demo `@expo.test` accounts are local-only and blocked from login in production).
-4. Create staff logins: `php artisan expo:staff you@company.com --name="Your Name"` (prompts for a 12+ character password).
+3. `php artisan key:generate && php artisan migrate --force && php artisan db:seed --force` creates services and the staff login `nadi@expo.local` / `password`. Demo `@expo.test` accounts are local-only and blocked from login in production.
+4. Add another staff login: `php artisan expo:staff you@company.com --name="Your Name"` (prompts for a 12+ character password).
 5. `php artisan storage:link`, then `php artisan config:cache`, `php artisan route:cache`, `php artisan view:cache`, `php artisan event:cache`.
 6. Serve over HTTPS; health check at `/up`. Generated URLs are forced to HTTPS in production. Back up `database/database.sqlite` and `storage/app/public/avatars` regularly.
 7. Staff can take a public message off the live map from `/staff/visitors` without deleting the visitor or lead.

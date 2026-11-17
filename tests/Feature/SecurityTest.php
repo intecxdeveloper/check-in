@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Visitor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -198,13 +199,19 @@ class SecurityTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_seeder_skips_demo_credentials_in_production(): void
+    public function test_production_seed_creates_nadi_staff_and_skips_demo_account(): void
     {
         $this->app['env'] = 'production';
-        $this->seed();
+
+        $this->artisan('db:seed', ['--force' => true])->assertSuccessful();
 
         $this->assertDatabaseMissing('users', ['email' => 'staff@expo.test']);
         $this->assertDatabaseHas('services', ['slug' => 'gis']);
+
+        $staff = User::query()->where('email', 'nadi@expo.local')->first();
+        $this->assertNotNull($staff);
+        $this->assertSame('Nadi', $staff->name);
+        $this->assertTrue(Hash::check('password', $staff->password));
     }
 
     public function test_health_check_is_available(): void
