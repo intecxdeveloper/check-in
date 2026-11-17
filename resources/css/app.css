@@ -1413,7 +1413,7 @@
 }
 
 .checkin-map {
-    height: 280px;
+    height: 180px;
     margin-top: 0.85rem;
     border-radius: 1.2rem;
     overflow: hidden;
@@ -1736,12 +1736,12 @@ body.checkin-map-is-expanded .checkin-actions {
     }
 
     .checkin-only-hero {
-        padding: 0.85rem 1rem 0.15rem;
+        padding: 0.65rem 1rem 0.1rem;
     }
 
     .checkin-only-hero h1 {
-        font-size: 1.45rem;
-        margin: 0.45rem 0 0.2rem;
+        font-size: 1.35rem;
+        margin: 0.3rem 0 0.15rem;
     }
 
     .checkin-only-hero p {
@@ -1767,14 +1767,14 @@ body.checkin-map-is-expanded .checkin-actions {
     }
 
     .interest-grid {
-        grid-template-columns: 1fr !important;
-        gap: 0.45rem;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 0.4rem;
     }
 
     .interest-chip {
-        min-height: 54px;
-        padding: 0.85rem 0.95rem;
-        font-size: 1rem;
+        min-height: 2.55rem;
+        padding: 0.4rem 0.65rem;
+        font-size: 0.8rem;
     }
 }
 
@@ -1864,7 +1864,7 @@ body.checkin-map-is-expanded .checkin-actions {
 .checkin-sheet[data-current-step="6"] .checkin-progress span { background: var(--color-green); opacity: 1; }
 
 .checkin-sheet .checkin-block {
-    padding: 1.15rem 0 1.2rem;
+    padding: 0.85rem 0 0.9rem;
     border-top: 1px solid var(--ck-line);
 }
 .checkin-sheet .checkin-block:first-child {
@@ -1874,20 +1874,23 @@ body.checkin-map-is-expanded .checkin-actions {
 .checkin-sheet .checkin-block-title {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--brand-navy, var(--ck-ink));
+}
+.checkin-only .checkin-sheet[data-mode="form"] .checkin-header {
+    display: none;
 }
 .checkin-sheet .checkin-step { animation: none; }
 .checkin-sheet[data-mode="success"] .checkin-fields { display: none !important; }
 .checkin-sheet[data-mode="success"] .checkin-actions { border-top: 0; }
 .checkin-sheet[data-mode="success"] .checkin-actions--done { display: none; }
 
-.checkin-sheet .checkin-help { margin: 0.4rem 0 0; font-size: 0.875rem; line-height: 1.5; font-weight: 500; color: var(--ck-mute); }
-.checkin-sheet .checkin-step > .checkin-help:first-child { margin: 0 0 0.25rem; font-size: 0.95rem; }
+.checkin-sheet .checkin-help { margin: 0.2rem 0 0; font-size: 0.82rem; line-height: 1.4; font-weight: 500; color: var(--ck-mute); }
+.checkin-sheet .checkin-step > .checkin-help:first-child { margin: 0 0 0.15rem; font-size: 0.82rem; }
 
-.checkin-sheet .checkin-step label { margin-top: 1rem; gap: 0.4rem; font-size: 0.875rem; font-weight: 600; color: var(--ck-ink); }
+.checkin-sheet .checkin-step label { margin-top: 0.7rem; gap: 0.3rem; font-size: 0.82rem; font-weight: 600; color: var(--ck-ink); }
 .checkin-sheet .checkin-step label:not(.consent-toggle):not(.avatar-upload-btn) { grid-template-columns: 1fr auto; align-items: baseline; }
 .checkin-sheet .checkin-step label:not(.consent-toggle):not(.avatar-upload-btn) > span:not(.sr-only) { font-weight: 500; color: var(--ck-mute); font-size: 0.8rem; margin: 0; }
 .checkin-sheet .checkin-step label > input { grid-column: 1 / -1; }
@@ -1936,7 +1939,7 @@ body.checkin-map-is-expanded .checkin-actions {
 .location-option-text { min-width: 0; }
 
 /* Place search */
-.checkin-sheet .location-search { position: relative; display: flex; gap: 0.5rem; margin-top: 1rem; }
+.checkin-sheet .location-search { position: relative; display: flex; gap: 0.5rem; margin-top: 0.65rem; }
 .checkin-sheet .checkin-step .location-search input[type="search"] { padding-left: 2.6rem; }
 .checkin-sheet .location-search input[type="search"]::-webkit-search-cancel-button { display: none; }
 .location-search-icon { position: absolute; left: 0.9rem; top: 50%; width: 1.1rem; height: 1.1rem; transform: translateY(-50%); pointer-events: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") center / contain no-repeat; }
@@ -1947,13 +1950,27 @@ body.checkin-map-is-expanded .checkin-actions {
 .location-status[data-tone="ok"] { color: #1f7a37; }
 .location-status[data-tone="warn"] { color: #8a5300; }
 .location-status[data-tone="error"] { padding: 0.65rem 0.8rem; border-radius: 0.75rem; background: rgba(255, 149, 0, 0.1); color: #8a5300; }
+.checkin-sheet .location-gps-btn {
+    width: auto;
+    min-height: 0;
+    margin: 0.45rem 0 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ck-accent);
+    font-size: 0.84rem;
+    font-weight: 600;
+    box-shadow: none;
+}
+.checkin-sheet .location-status-row:has(#location-status[hidden]) {
+    display: none;
+}
 .checkin-sheet .checkin-map {
-    margin-top: 0.75rem;
+    margin-top: 0.55rem;
     border-radius: 1rem;
     border: 1px solid var(--ck-line);
-    min-height: 18rem;
-    height: min(58dvh, 26rem);
-    touch-action: none;
+    min-height: 11rem;
+    height: min(30dvh, 14.5rem);
 }
 .checkin-sheet .checkin-map .maplibregl-canvas,
 .checkin-sheet .checkin-map .maplibregl-canvas-container {
@@ -2001,8 +2018,8 @@ body.checkin-map-is-expanded .checkin-actions {
 
 @media (max-width: 720px) {
     .checkin-sheet .checkin-map {
-        min-height: 20rem;
-        height: min(62dvh, 28rem);
+        min-height: 10.5rem;
+        height: min(28dvh, 13.5rem);
     }
 }
 .checkin-sheet .checkin-map-stage-bar { margin-top: 1rem; }
@@ -2012,29 +2029,49 @@ body.checkin-map-is-expanded .checkin-actions {
 .checkin-sheet .location-banner { border-radius: 1rem; background: rgba(52, 199, 89, 0.08); border: 1px solid rgba(52, 199, 89, 0.22); box-shadow: none; }
 
 /* Interests */
-.checkin-sheet .interest-grid { gap: 0.5rem; margin-top: 0.75rem; }
+.checkin-sheet .interest-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+    margin-top: 0.55rem;
+}
 .checkin-sheet .interest-chip {
-    position: relative; display: flex; align-items: center; gap: 0.7rem; min-height: 52px; margin: 0;
-    padding: 0.8rem 0.9rem; border-radius: var(--ck-radius); border: 1px solid var(--ck-line); background: #fff;
-    color: var(--ck-ink); font-size: 0.95rem; font-weight: 600; cursor: pointer; box-shadow: none;
+    position: relative; display: flex; align-items: center; gap: 0.45rem; min-height: 2.55rem; margin: 0;
+    padding: 0.4rem 0.7rem; border-radius: 999px; border: 1px solid var(--ck-line); background: #fff;
+    color: var(--ck-ink); font-size: 0.8rem; font-weight: 600; cursor: pointer; box-shadow: none;
     transition: border-color 150ms ease, background-color 150ms ease;
 }
 .checkin-sheet .interest-chip.is-selected,
-.checkin-sheet .interest-chip:has(input:checked) { border-color: var(--interest-color, var(--ck-accent)); background: color-mix(in srgb, var(--interest-color, #0058b8) 7%, #fff); box-shadow: inset 0 0 0 1px var(--interest-color, var(--ck-accent)); }
-.checkin-sheet .interest-chip input[type="checkbox"] { order: 3; margin: 0 0 0 auto; width: 1.25rem; height: 1.25rem; flex: none; accent-color: var(--interest-color, var(--ck-accent)); }
+.checkin-sheet .interest-chip:has(input:checked) { border-color: var(--interest-color, var(--ck-accent)); background: color-mix(in srgb, var(--interest-color, #0058b8) 10%, #fff); box-shadow: inset 0 0 0 1px var(--interest-color, var(--ck-accent)); }
+.checkin-sheet .interest-chip input[type="checkbox"] {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0;
+    accent-color: var(--interest-color, var(--ck-accent));
+}
 .checkin-sheet .interest-chip:has(input:focus-visible) { outline: 3px solid rgba(0, 88, 184, 0.4); outline-offset: 2px; }
-.checkin-sheet .interest-option-swatch { width: 0.6rem; height: 0.6rem; border-radius: 999px; background: var(--interest-color, var(--ck-accent)); flex: none; }
-.checkin-sheet .interest-option-label { color: var(--ck-ink); font-weight: 600; }
-.checkin-sheet #other-interest-wrap { margin-top: 0.75rem; }
+.checkin-sheet .interest-option-swatch { width: 0.45rem; height: 0.45rem; border-radius: 999px; background: var(--interest-color, var(--ck-accent)); flex: none; }
+.checkin-sheet .interest-option-label { color: var(--ck-ink); font-weight: 600; line-height: 1.2; }
+.checkin-sheet #other-interest-wrap { margin-top: 0.55rem; }
 
 /* Review + consent */
-.checkin-sheet .consent-card { border-radius: 1rem; background: var(--ck-soft); border: 1px solid var(--ck-line); padding: 0.9rem 1rem; box-shadow: none; }
-.checkin-sheet .consent-card p { margin: 0.2rem 0; font-size: 0.875rem; font-weight: 500; line-height: 1.5; color: var(--ck-mute); }
-.checkin-sheet .consent-card strong { color: var(--ck-ink); font-weight: 600; }
+.checkin-sheet .checkin-extras,
+.checkin-sheet .privacy-note {
+    margin-top: 0.35rem;
+    padding: 0 0.1rem;
+    border-radius: 0;
+    background: transparent;
+}
+.checkin-sheet .checkin-extras summary,
+.checkin-sheet .privacy-note summary {
+    padding: 0.55rem 0;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--ck-accent);
+}
+.checkin-sheet .checkin-extras .checkin-grid { margin-bottom: 0.4rem; }
 .checkin-sheet .consent-toggle,
 .checkin-sheet .consent-toggle-fun {
-    display: flex; align-items: center; gap: 0.75rem; min-height: 52px; margin-top: 0.5rem; padding: 0.75rem 0.9rem;
-    border: 1px solid var(--ck-line); border-radius: var(--ck-radius); background: #fff; box-shadow: none; cursor: pointer;
+    display: flex; align-items: flex-start; gap: 0.65rem; min-height: 2.5rem; margin-top: 0.35rem; padding: 0.2rem 0;
+    border: 0; border-radius: 0; background: transparent; box-shadow: none; cursor: pointer;
 }
 .checkin-sheet .consent-toggle:has(input:checked) { border-color: rgba(0, 88, 184, 0.35); background: rgba(0, 88, 184, 0.04); }
 .checkin-sheet .consent-toggle input { margin: 0; width: 1.25rem; height: 1.25rem; flex: none; accent-color: var(--ck-accent); }
@@ -2051,6 +2088,9 @@ body.checkin-map-is-expanded .checkin-actions {
     margin: 1.25rem -1.5rem 0; padding: 0.85rem 1.5rem max(0.85rem, env(safe-area-inset-bottom));
     gap: 0.6rem; background: rgba(255, 255, 255, 0.96); border-top: 1px solid var(--color-line);
     border-radius: 0 0 1.5rem 1.5rem;
+}
+.checkin-only .checkin-actions {
+    position: static;
 }
 .checkin-sheet .btn-primary,
 .checkin-sheet .btn-secondary { min-height: 52px; border-radius: var(--ck-radius); font-size: 1rem; font-weight: 600; transition: background-color 150ms ease, transform 120ms ease, opacity 150ms ease; }

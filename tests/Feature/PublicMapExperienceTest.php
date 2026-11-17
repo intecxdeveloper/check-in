@@ -68,8 +68,8 @@ class PublicMapExperienceTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Join the Malaysia map', false)
-            ->assertSee('Use my location', false)
-            ->assertSee('Open big map', false)
+            ->assertSee('Use this phone', false)
+            ->assertDontSee('Open big map', false)
             ->assertSee('id="checkin-map-stage"', false)
             ->assertSee('id="prize-receipt"', false)
             ->assertSee('id="checkin-fields"', false)

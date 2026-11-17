@@ -29,10 +29,10 @@
         >
         <div class="aiva-greeting">
             @include('partials.aiva', ['pose' => 'wave', 'size' => 56, 'loading' => 'eager', 'class' => 'aiva-greeting-img'])
-            <p class="aiva-bubble"><strong>Hi, I’m Aiva.</strong> One page — then show your receipt at the counter.</p>
+            <p class="aiva-bubble"><strong>Hi, I’m Aiva.</strong> A few taps — then show your receipt at the counter.</p>
         </div>
         <h1>Join the Malaysia map</h1>
-        <p>Your name stays private. The pin is only for the booth map.</p>
+        <p>Your name stays private. A city is enough for the booth map.</p>
     </div>
 
     <div id="company-card" class="company-card hidden" hidden></div>

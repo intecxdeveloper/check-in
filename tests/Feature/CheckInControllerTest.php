@@ -116,7 +116,7 @@ class CheckInControllerTest extends TestCase
         $this->get(route('check-in'))
             ->assertOk()
             ->assertSee('name="other_interest"', false)
-            ->assertSee('Type anything', false);
+            ->assertSee('Hydrography, drones, CAD', false);
     }
 
     public function test_check_in_always_shows_the_avatar_on_the_map(): void
@@ -141,11 +141,27 @@ class CheckInControllerTest extends TestCase
             ->assertSee('name="privacy_accepted"', false)
             ->assertSee('id="checkin-map"', false)
             ->assertSee('Join the map', false)
-            ->assertSee('Your avatar always appears on the live booth map.', false)
             ->assertDontSee('Show my avatar on the live booth map', false)
             ->assertDontSee('id="checkin-back"', false)
             ->assertDontSee('Step 1 of 5', false)
-            ->assertDontSee('Continue', false);
+            ->assertDontSee('Continue', false)
+            ->assertDontSee('Upload photo / logo', false)
+            ->assertDontSee('Open big map', false)
+            ->assertDontSee('id="avatar-presets"', false)
+            ->assertSee('A city is enough', false)
+            ->assertSee('Add role, website, or a map message', false);
+    }
+
+    public function test_check_in_assigns_an_avatar_from_the_visitor_name(): void
+    {
+        $this->postJson('/api/check-in', $this->payload([
+            'services' => [$this->gisService()->id],
+        ]))->assertCreated();
+
+        $visitor = Visitor::query()->latest('id')->first();
+
+        $this->assertSame('Aina Test', $visitor->avatar_seed);
+        $this->assertNull($visitor->avatar_path);
     }
 
     public function test_staff_visitors_page_escapes_typed_other_interest(): void

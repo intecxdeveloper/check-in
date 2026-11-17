@@ -1,4 +1,4 @@
-import { PRESET_AVATARS, avatarUrl, presetAvatarUrl } from './avatars';
+import { avatarUrl } from './avatars';
 import { loadMapLibre } from './maplibre';
 
 export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services, onSuccess, lockOpen = false }) {
@@ -13,12 +13,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     const locationResults = root.querySelector('#location-results');
     const companyInput = root.querySelector('#company-name-input');
     const companyResults = root.querySelector('#company-results');
-    const avatarPresets = root.querySelector('#avatar-presets');
-    const avatarPreview = root.querySelector('#avatar-preview');
-    const avatarPreviewLabel = root.querySelector('#avatar-preview-label');
     const avatarSeedInput = root.querySelector('#avatar-seed');
-    const avatarFileInput = root.querySelector('#avatar-file');
-    const avatarClearBtn = root.querySelector('#avatar-clear-upload');
     const locationBanner = root.querySelector('#location-banner');
     const locationHelp = root.querySelector('#location-help');
 
@@ -30,17 +25,13 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     let companySearchAbort = null;
     let reverseTimer = null;
     let selectedCompany = null;
-    let uploadedObjectUrl = null;
-    let uploadedDataUrl = null;
-    let compressPromise = null;
-    let selectedPreset = PRESET_AVATARS[0];
 
     renderInterestOptions(services);
     bindInterestChips();
     ensureInterestOptions();
 
-    renderAvatarPresets();
-    setPresetAvatar(selectedPreset);
+    assignAvatarFromName();
+    form.full_name?.addEventListener('input', assignAvatarFromName);
 
     root.querySelector('#checkin-close')?.addEventListener('click', close);
     const locationQuery = root.querySelector('#location-query');
@@ -86,63 +77,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         const button = event.target.closest('[data-result-index]');
         if (button) pickLocation(Number(button.dataset.resultIndex));
     });
-    root.querySelector('#location-adjust-btn')?.addEventListener('click', () => {
-        locationBanner.hidden = true;
-        ensureCheckinMap();
-    });
     root.querySelector('#location-gps-btn')?.addEventListener('click', useDeviceLocation);
-
-    const mapStage = root.querySelector('#checkin-map-stage');
-    const mapFullscreenBtn = root.querySelector('#checkin-map-fullscreen');
-    const mapDoneBtn = root.querySelector('#checkin-map-done');
-    const mapStageAnchor = document.createComment('checkin-map-stage');
-    mapStage?.parentNode?.insertBefore(mapStageAnchor, mapStage);
-
-    function isMapExpanded() {
-        return Boolean(mapStage?.classList.contains('is-expanded'));
-    }
-
-    function setMapExpanded(expanded) {
-        if (! mapStage) {
-            return;
-        }
-
-        mapStage.classList.toggle('is-expanded', expanded);
-        document.documentElement.classList.toggle('checkin-map-is-expanded', expanded);
-        document.body.classList.toggle('checkin-map-is-expanded', expanded);
-        mapFullscreenBtn?.setAttribute('aria-pressed', expanded ? 'true' : 'false');
-        if (mapFullscreenBtn) {
-            mapFullscreenBtn.textContent = expanded ? 'Done with map' : 'Open big map';
-        }
-
-        if (expanded) {
-            document.body.appendChild(mapStage);
-        } else if (mapStageAnchor.parentNode) {
-            mapStageAnchor.parentNode.insertBefore(mapStage, mapStageAnchor.nextSibling);
-        }
-
-        requestAnimationFrame(() => {
-            checkinMap?.resize();
-            if (expanded) {
-                locationQuery?.focus({ preventScroll: true });
-            }
-        });
-    }
-
-    mapFullscreenBtn?.addEventListener('click', () => {
-        const next = ! isMapExpanded();
-        setMapExpanded(next);
-        if (next) {
-            ensureCheckinMap();
-        }
-    });
-    mapDoneBtn?.addEventListener('click', () => setMapExpanded(false));
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && isMapExpanded()) {
-            event.preventDefault();
-            setMapExpanded(false);
-        }
-    });
 
     companyInput?.addEventListener('input', () => {
         selectedCompany = null;
@@ -160,41 +95,6 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         if (! companyResults) return;
         if (event.target === companyInput || companyResults.contains(event.target)) return;
         companyResults.hidden = true;
-    });
-
-    avatarFileInput?.addEventListener('change', () => {
-        const file = avatarFileInput.files?.[0];
-        if (! file) return;
-        hideError();
-        if (uploadedObjectUrl) URL.revokeObjectURL(uploadedObjectUrl);
-        uploadedObjectUrl = URL.createObjectURL(file);
-        uploadedDataUrl = null;
-        avatarPreview.src = uploadedObjectUrl;
-        avatarPreviewLabel.textContent = 'Preparing photo…';
-        avatarSeedInput.value = '';
-        avatarClearBtn?.classList.remove('hidden');
-        avatarPresets?.querySelectorAll('.avatar-preset').forEach((el) => el.classList.remove('active'));
-        compressPromise = prepareAvatarUpload(file)
-            .then((dataUrl) => {
-                uploadedDataUrl = dataUrl;
-                avatarPreview.src = dataUrl;
-                avatarPreviewLabel.textContent = 'Your upload · face or logo';
-                if (uploadedObjectUrl) {
-                    URL.revokeObjectURL(uploadedObjectUrl);
-                    uploadedObjectUrl = null;
-                }
-                syncPinPreview();
-            })
-            .catch((error) => {
-                clearUpload();
-                setPresetAvatar(selectedPreset || PRESET_AVATARS[0]);
-                showError(error?.message || 'Please upload a JPG, PNG or WebP photo.');
-            });
-    });
-
-    avatarClearBtn?.addEventListener('click', () => {
-        clearUpload();
-        setPresetAvatar(selectedPreset || PRESET_AVATARS[0]);
     });
 
     const messageInput = root.querySelector('#display-message-input') || form.querySelector('[name="display_message"]');
@@ -258,7 +158,6 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         if (lockOpen && complete) {
             return;
         }
-        setMapExpanded(false);
         modal.classList.add('hidden');
         destroyMap();
     }
@@ -274,8 +173,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         }
         complete = false;
         selectedCompany = null;
-        clearUpload();
-        setPresetAvatar(PRESET_AVATARS[0]);
+        assignAvatarFromName();
         form.querySelector('[name="country"]').value = 'Malaysia';
         const publicDisplay = form.querySelector('[name="public_display_enabled"]');
         if (publicDisplay) {
@@ -288,7 +186,6 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         form.querySelector('[name="latitude"]').value = '';
         form.querySelector('[name="longitude"]').value = '';
         if (locationBanner) locationBanner.hidden = true;
-        setMapExpanded(false);
         destroyMap();
     }
 
@@ -298,15 +195,6 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             checkinMap = null;
             pinMarker = null;
         }
-    }
-
-    function clearUpload() {
-        if (uploadedObjectUrl) URL.revokeObjectURL(uploadedObjectUrl);
-        uploadedObjectUrl = null;
-        uploadedDataUrl = null;
-        compressPromise = null;
-        if (avatarFileInput) avatarFileInput.value = '';
-        avatarClearBtn?.classList.add('hidden');
     }
 
     function renderInterestOptions(list) {
@@ -402,40 +290,12 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         }
     }
 
-    function renderAvatarPresets() {
-        if (! avatarPresets) return;
-        avatarPresets.innerHTML = PRESET_AVATARS.map((preset) => `
-            <button type="button" class="avatar-preset" data-seed="${escapeHtml(preset.seed)}" aria-label="${escapeHtml(preset.label)}">
-                <img src="${presetAvatarUrl(preset, 96)}" alt="" width="56" height="56" loading="lazy">
-            </button>
-        `).join('');
-
-        avatarPresets.querySelectorAll('.avatar-preset').forEach((button) => {
-            button.addEventListener('click', () => {
-                clearUpload();
-                const preset = PRESET_AVATARS.find((item) => item.seed === button.dataset.seed) || PRESET_AVATARS[0];
-                setPresetAvatar(preset);
-            });
-        });
-    }
-
-    function setPresetAvatar(presetOrSeed) {
-        const preset = typeof presetOrSeed === 'string'
-            ? (PRESET_AVATARS.find((item) => item.seed === presetOrSeed) || {
-                seed: presetOrSeed,
-                label: presetOrSeed,
-            })
-            : presetOrSeed;
-
-        selectedPreset = preset;
-        avatarSeedInput.value = preset.seed;
-        avatarPreview.src = preset.clothing
-            ? presetAvatarUrl(preset, 160)
-            : avatarUrl(preset.seed, 160);
-        avatarPreviewLabel.textContent = `Preset · ${preset.label || preset.seed}`;
-        avatarPresets?.querySelectorAll('.avatar-preset').forEach((el) => {
-            el.classList.toggle('active', el.dataset.seed === preset.seed);
-        });
+    function assignAvatarFromName() {
+        const name = form.full_name?.value.trim() || '';
+        if (avatarSeedInput) {
+            avatarSeedInput.value = name.slice(0, 80);
+        }
+        syncPinPreview();
     }
 
     const submitLabel = 'Join the map';
@@ -475,7 +335,6 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     function showSuccess() {
         complete = true;
         root.classList.add('checkin-complete');
-        setMapExpanded(false);
         fieldsEl?.classList.add('hidden');
         if (fieldsEl) {
             fieldsEl.hidden = true;
@@ -616,16 +475,15 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
                     : 'Location ready';
                 root.querySelector('#location-banner-copy').textContent = selectedCompany?.location
                     || [form.city.value, form.region.value, form.country.value].filter(Boolean).join(', ')
-                    || 'Looks good — adjust anytime on the map.';
+                    || 'City is enough — tap the map only if that’s the wrong area.';
             }
             if (locationHelp) {
-                locationHelp.textContent = 'We found your company’s pin. Hold the avatar and drag it if you need to move it.';
+                locationHelp.textContent = 'That’s close enough.';
             }
-            root.querySelector('.location-details')?.setAttribute('open', '');
         } else {
             if (locationBanner) locationBanner.hidden = true;
             if (locationHelp) {
-                locationHelp.textContent = 'Search, use this phone, or tap the map. Then hold the avatar and drag it.';
+                locationHelp.textContent = 'A city is enough.';
             }
         }
     }
@@ -642,7 +500,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 setPin(position.coords.longitude, position.coords.latitude, { reverse: true, fly: true });
-                setLocationStatus('Pin placed from this phone. Hold the avatar and drag it to the exact spot.', 'ok');
+                setLocationStatus('Placed from this phone. City-level is perfect.', 'ok');
                 hideError();
             },
             () => {
@@ -693,7 +551,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         checkinMap.on('click', (event) => {
             if (locationBanner) locationBanner.hidden = true;
             setPin(event.lngLat.lng, event.lngLat.lat, { reverse: true, fly: true });
-            setLocationStatus('Pin dropped. Hold the avatar and drag it with your finger.', 'ok');
+            setLocationStatus('Nice — that area is enough.', 'ok');
         });
         checkinMap.on('load', () => {
             const lat = form.querySelector('[name="latitude"]').value;
@@ -705,9 +563,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     }
 
     function currentAvatarSrc() {
-        if (uploadedDataUrl) return uploadedDataUrl;
-        if (uploadedObjectUrl) return uploadedObjectUrl;
-        return avatarUrl(avatarSeedInput.value || form.full_name?.value || 'friend', 96);
+        return avatarUrl(avatarSeedInput?.value || form.full_name?.value || 'friend', 96);
     }
 
     function syncPinPreview() {
@@ -729,34 +585,21 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             const el = document.createElement('div');
             el.className = 'avatar-marker avatar-marker--pop avatar-marker--checkin';
             el.innerHTML = `
-                <span class="avatar-marker-grip">Hold &amp; drag</span>
                 <span class="avatar-marker-face">
-                    <img src="${currentAvatarSrc()}" alt="" width="72" height="72">
+                    <img src="${currentAvatarSrc()}" alt="" width="56" height="56">
                 </span>
                 <span class="avatar-marker-tip" aria-hidden="true"></span>
             `;
             pinMarker = new maplibregl.Marker({
                 element: el,
                 anchor: 'bottom',
-                draggable: true,
+                draggable: false,
                 clickTolerance: 24,
                 pitchAlignment: 'viewport',
                 rotationAlignment: 'viewport',
             })
                 .setLngLat([longitude, latitude])
                 .addTo(checkinMap);
-
-            pinMarker.on('dragstart', () => {
-                el.classList.add('is-dragging');
-            });
-            pinMarker.on('dragend', () => {
-                el.classList.remove('is-dragging');
-                const pos = pinMarker.getLngLat();
-                form.querySelector('[name="longitude"]').value = pos.lng.toFixed(7);
-                form.querySelector('[name="latitude"]').value = pos.lat.toFixed(7);
-                reverseGeocode(pos.lng, pos.lat);
-                setLocationStatus('Pin moved. Let go when the spot looks right.', 'ok');
-            });
         } else {
             syncPinPreview();
             pinMarker.setLngLat([longitude, latitude]);
@@ -765,7 +608,8 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         if (fly) {
             checkinMap.easeTo({
                 center: [longitude, latitude],
-                zoom: Math.max(checkinMap.getZoom(), 14.2),
+                zoom: 9.2,
+                padding: { top: 48, bottom: 28, left: 24, right: 24 },
                 duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 500,
             });
         }
@@ -826,11 +670,16 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         if (! result) return;
         applyLocationFields(result);
         setPin(result.longitude, result.latitude, { reverse: false, fly: false });
-        checkinMap?.easeTo({ center: [Number(result.longitude), Number(result.latitude)], zoom: 15, duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 700 });
+        checkinMap?.easeTo({
+            center: [Number(result.longitude), Number(result.latitude)],
+            zoom: 9.2,
+            padding: { top: 48, bottom: 28, left: 24, right: 24 },
+            duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 700,
+        });
         if (locationBanner) locationBanner.hidden = true;
         renderLocationRows([]);
         if (locationQuery) locationQuery.value = result.name || String(result.label || '').split(',')[0];
-        setLocationStatus(`Pin placed at ${result.label}. Hold the avatar and drag it to fine-tune.`, 'ok');
+        setLocationStatus(`${result.label} — that’s close enough.`, 'ok');
         hideError();
         checkinMap?.getContainer().scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
@@ -838,7 +687,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     async function searchLocation({ force = false } = {}) {
         const q = locationQuery?.value.trim() || '';
         if (q.length < 2) {
-            setLocationStatus('Type a place, area or address — or tap the map.', 'warn');
+            setLocationStatus('Type a city — or tap the map.', 'warn');
             locationQuery?.focus();
             return;
         }
@@ -858,14 +707,14 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             const rows = (data.results || []).filter((row) => Number.isFinite(Number(row.latitude)) && Number.isFinite(Number(row.longitude)));
             renderLocationRows(rows);
             setLocationStatus(rows.length
-                ? `${rows.length} ${rows.length === 1 ? 'place' : 'places'} found — tap one to drop your pin.`
-                : `No places match “${q}”. Try a city or area name, or tap the map.`, rows.length ? '' : 'warn');
+                ? `${rows.length} ${rows.length === 1 ? 'place' : 'places'} — tap one.`
+                : `No match for “${q}”. Try a city name, or tap the map.`, rows.length ? '' : 'warn');
         } catch (error) {
             if (signal.aborted || error?.name === 'AbortError') return;
             renderLocationRows([]);
             // Keep what they typed so the address still reaches staff.
             form.querySelector('[name="address_text"]').value = q;
-            setLocationStatus('Place search is unavailable right now. Tap the map or drag your avatar to your area — we’ll keep the address you typed.', 'error');
+            setLocationStatus('Place search is taking a break. Tap your city on the map — we’ll keep what you typed.', 'error');
         } finally {
             if (! signal.aborted) wrap?.removeAttribute('aria-busy');
         }
@@ -909,7 +758,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             return false;
         }
         if (! form.latitude.value || ! form.longitude.value) {
-            showError('Search for a place or tap the map to drop your pin.', locationQuery);
+            showError('Search a city or tap the map — close is plenty.', locationQuery);
             return false;
         }
         if (! form.privacy_accepted.checked) {
@@ -924,18 +773,6 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         submitting = true;
         nextBtn.disabled = true;
         nextBtn.textContent = 'Joining…';
-
-        if (compressPromise) {
-            try {
-                await compressPromise;
-            } catch (error) {
-                showError(error?.message || 'Please upload a JPG, PNG or WebP photo.');
-                nextBtn.disabled = false;
-                nextBtn.textContent = submitLabel;
-                submitting = false;
-                return;
-            }
-        }
 
         const serviceIds = [...form.querySelectorAll('input[name="services[]"]:checked')].map((el) => Number(el.value));
         const body = {
@@ -957,12 +794,8 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             privacy_accepted: form.privacy_accepted.checked,
             services: serviceIds,
             other_interest: otherInterestSelected() ? (otherInterestInput()?.value.trim() || '') : '',
+            avatar_seed: avatarSeedInput?.value || form.full_name.value.trim() || 'friend',
         };
-        if (uploadedDataUrl) {
-            body.avatar = uploadedDataUrl;
-        } else {
-            body.avatar_seed = avatarSeedInput.value || form.full_name.value.trim() || 'friend';
-        }
 
         try {
             const result = await window.expoFetch('/api/check-in', {
@@ -1088,77 +921,4 @@ function escapeHtml(value) {
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;');
-}
-
-const AVATAR_MAX_EDGE = 640;
-const AVATAR_MAX_SOURCE_BYTES = 6 * 1024 * 1024;
-const AVATAR_MAX_DATA_URL_CHARS = 1_400_000;
-const AVATAR_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
-async function prepareAvatarUpload(file) {
-    if (! AVATAR_ALLOWED_TYPES.includes(file.type)) {
-        throw new Error('Please upload a JPG, PNG or WebP photo.');
-    }
-    if (file.size > AVATAR_MAX_SOURCE_BYTES) {
-        throw new Error('Keep uploads under 6MB — a phone photo is perfect.');
-    }
-
-    const image = await loadImageSource(file);
-    const width = image.width;
-    const height = image.height;
-    const scale = Math.min(1, AVATAR_MAX_EDGE / Math.max(width, height));
-    const targetWidth = Math.max(1, Math.round(width * scale));
-    const targetHeight = Math.max(1, Math.round(height * scale));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    const context = canvas.getContext('2d', { alpha: file.type === 'image/png' });
-    if (! context) {
-        throw new Error('Please upload a JPG, PNG or WebP photo.');
-    }
-    context.drawImage(image, 0, 0, targetWidth, targetHeight);
-    image.close?.();
-
-    const preferPng = file.type === 'image/png';
-    let dataUrl = canvas.toDataURL(preferPng ? 'image/png' : 'image/webp', 0.82);
-    if (! dataUrl.startsWith('data:image/')) {
-        dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-    }
-
-    let quality = 0.82;
-    while (dataUrl.length > AVATAR_MAX_DATA_URL_CHARS && quality > 0.45) {
-        quality -= 0.12;
-        dataUrl = canvas.toDataURL('image/jpeg', quality);
-    }
-
-    if (dataUrl.length > AVATAR_MAX_DATA_URL_CHARS) {
-        throw new Error('Keep uploads under 6MB — a phone photo is perfect.');
-    }
-
-    return dataUrl;
-}
-
-function loadImageSource(file) {
-    if (typeof createImageBitmap === 'function') {
-        return createImageBitmap(file).catch(() => loadImageElement(file));
-    }
-
-    return loadImageElement(file);
-}
-
-function loadImageElement(file) {
-    return new Promise((resolve, reject) => {
-        const url = URL.createObjectURL(file);
-        const image = new Image();
-        image.onload = () => {
-            URL.revokeObjectURL(url);
-            resolve(image);
-        };
-        image.onerror = () => {
-            URL.revokeObjectURL(url);
-            reject(new Error('Please upload a JPG, PNG or WebP photo.'));
-        };
-        image.src = url;
-    });
 }
