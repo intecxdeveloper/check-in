@@ -26,7 +26,7 @@ class StoreCheckInRequest extends FormRequest
         }
 
         $this->merge([
-            'public_display_enabled' => $this->toBool($this->input('public_display_enabled'), true),
+            'public_display_enabled' => '1',
             'follow_up_consent' => $this->toBool($this->input('follow_up_consent'), false),
             'privacy_accepted' => $this->toBool($this->input('privacy_accepted'), false) ? '1' : '0',
             'services' => $services,
@@ -64,7 +64,7 @@ class StoreCheckInRequest extends FormRequest
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'public_website' => ['nullable', 'url:http,https', 'max:255'],
-            'public_display_enabled' => ['required', 'boolean'],
+            'public_display_enabled' => ['required', 'accepted'],
             'follow_up_consent' => ['required', 'boolean'],
             'privacy_accepted' => ['accepted'],
             'services' => ['required', 'array', 'min:1'],
@@ -96,6 +96,7 @@ class StoreCheckInRequest extends FormRequest
     {
         return [
             'privacy_accepted.accepted' => 'A quick privacy tick keeps everyone comfortable.',
+            'public_display_enabled.accepted' => 'Your avatar is shown on the live booth map.',
             'services.required' => 'Pick at least one interest — any is fine.',
             'services.min' => 'Pick at least one interest — any is fine.',
             'other_interest.required' => 'Type the interest you have in mind.',

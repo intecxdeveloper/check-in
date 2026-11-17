@@ -42,6 +42,14 @@
             <p class="expo-brand-tag">Live visitor map</p>
         </header>
 
+        <aside class="expo-invite" id="expo-invite" aria-label="Come check in. Collect a gift.">
+            @include('partials.aiva', ['pose' => 'wave', 'size' => 72, 'class' => 'expo-invite-aiva', 'loading' => 'eager'])
+            <div class="expo-invite-copy">
+                <p class="expo-invite-title">Come check in. Collect a gift.</p>
+                <p class="expo-invite-text">One page on your phone. Then spin the NADI wheel at this booth.</p>
+            </div>
+        </aside>
+
         <div class="expo-pulse pointer-events-auto" aria-label="Live totals">
             <div>
                 <strong data-stat="check_ins">0</strong>
@@ -128,29 +136,14 @@
     </div>
 
     <div id="checkin-modal" class="checkin-modal hidden" role="dialog" aria-modal="true" aria-labelledby="checkin-title">
-        <div class="checkin-sheet">
+        <div class="checkin-sheet" data-mode="form">
             <div class="checkin-header">
                 <div>
-                    <p class="checkin-eyebrow" id="checkin-step-label" aria-live="polite">Step 1 of 5</p>
-                    <h2 id="checkin-title" tabindex="-1">About you</h2>
+                    <p class="checkin-eyebrow" id="checkin-step-label" aria-live="polite">One page</p>
+                    <h2 id="checkin-title" tabindex="-1">Check in</h2>
                 </div>
                 <button type="button" id="checkin-close" class="checkin-close" aria-label="Close check-in">×</button>
             </div>
-
-            <div class="checkin-progress" role="progressbar" aria-label="Check-in progress" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1">
-                <span data-step-dot="1" class="active current"></span>
-                <span data-step-dot="2"></span>
-                <span data-step-dot="3"></span>
-                <span data-step-dot="4"></span>
-                <span data-step-dot="5"></span>
-            </div>
-            <ol class="checkin-step-names" aria-hidden="true">
-                <li data-step-name="1">You</li>
-                <li data-step-name="2">Company</li>
-                <li data-step-name="3">Interests</li>
-                <li data-step-name="4">Place</li>
-                <li data-step-name="5">Join</li>
-            </ol>
 
             @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'services' => $services])
         </div>

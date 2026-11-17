@@ -7,7 +7,8 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     const form = root.querySelector('#checkin-form');
     const errorEl = root.querySelector('#checkin-error');
     const nextBtn = root.querySelector('#checkin-next');
-    const backBtn = root.querySelector('#checkin-back');
+    const fieldsEl = root.querySelector('#checkin-fields');
+    const successEl = root.querySelector('#checkin-success');
     const interestOptions = root.querySelector('#interest-options');
     const locationResults = root.querySelector('#location-results');
     const companyInput = root.querySelector('#company-name-input');
@@ -21,8 +22,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     const locationBanner = root.querySelector('#location-banner');
     const locationHelp = root.querySelector('#location-help');
 
-    let step = 1;
-    let stepHasRendered = false;
+    let complete = false;
     let checkinMap = null;
     let pinMarker = null;
     let submitting = false;
@@ -112,7 +112,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         document.body.classList.toggle('checkin-map-is-expanded', expanded);
         mapFullscreenBtn?.setAttribute('aria-pressed', expanded ? 'true' : 'false');
         if (mapFullscreenBtn) {
-            mapFullscreenBtn.textContent = expanded ? 'Exit full screen' : 'Full screen';
+            mapFullscreenBtn.textContent = expanded ? 'Done with map' : 'Open big map';
         }
 
         if (expanded) {
@@ -210,18 +210,27 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         }
     });
 
-    nextBtn.addEventListener('click', async () => {
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
         hideError();
-        if (step < 5) {
-            if (! validateStep(step)) return;
-            goTo(step + 1);
+        if (complete) {
+            finishAfterSuccess();
             return;
         }
-        if (step === 5) {
-            if (! validateStep(5)) return;
-            await submit();
+        if (! validateForm()) {
             return;
         }
+        await submit();
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (! complete) {
+            return;
+        }
+        finishAfterSuccess();
+    });
+
+    function finishAfterSuccess() {
         if (hasPrizeReceipt()) {
             return;
         }
@@ -230,21 +239,25 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             return;
         }
         close();
-    });
-
-    backBtn?.addEventListener('click', () => {
-        hideError();
-        if (step > 1 && step < 6) goTo(step - 1);
-    });
+    }
 
     function open() {
-        if (step !== 6) resetForm();
+        if (! complete) {
+            resetForm();
+        }
         modal.classList.remove('hidden');
-        goTo(step === 6 ? 6 : 1);
+        if (complete) {
+            showSuccess();
+        } else {
+            showForm();
+            prepareLocationStep();
+        }
     }
 
     function close() {
-        if (lockOpen && step === 6) return;
+        if (lockOpen && complete) {
+            return;
+        }
         setMapExpanded(false);
         modal.classList.add('hidden');
         destroyMap();
@@ -259,11 +272,15 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             companyResults.innerHTML = '';
             companyResults.hidden = true;
         }
+        complete = false;
         selectedCompany = null;
         clearUpload();
         setPresetAvatar(PRESET_AVATARS[0]);
         form.querySelector('[name="country"]').value = 'Malaysia';
-        form.querySelector('[name="public_display_enabled"]').checked = true;
+        const publicDisplay = form.querySelector('[name="public_display_enabled"]');
+        if (publicDisplay) {
+            publicDisplay.value = '1';
+        }
         syncOtherInterestField();
         hideError();
         submitting = false;
@@ -421,65 +438,74 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         });
     }
 
-    const stepCopy = {
-        1: { label: 'Step 1 of 5', title: 'About you', next: 'Continue' },
-        2: { label: 'Step 2 of 5', title: 'Your company', next: 'Continue' },
-        3: { label: 'Step 3 of 5', title: 'Your interests', next: 'Continue' },
-        4: { label: 'Step 4 of 5', title: 'Where you’re based', next: 'Continue' },
-        5: { label: 'Step 5 of 5', title: 'Review and join', next: 'Join the map' },
-        6: { label: 'Done', title: 'Looking good!', next: 'Back to the map' },
-    };
+    const submitLabel = 'Join the map';
 
     function hasPrizeReceipt() {
         return Boolean(root.querySelector('#prize-receipt'));
     }
 
-    function goTo(nextStep) {
-        step = nextStep;
-        form.querySelectorAll('[data-step]').forEach((section) => {
-            section.classList.toggle('hidden', Number(section.dataset.step) !== step);
-        });
-        root.querySelectorAll('[data-step-dot]').forEach((dot) => {
-            const n = Number(dot.dataset.stepDot);
-            dot.classList.toggle('active', n <= Math.min(step, 5));
-            dot.classList.toggle('current', n === step);
-        });
-        root.querySelectorAll('[data-step-name]').forEach((el) => {
-            const n = Number(el.dataset.stepName);
-            el.classList.toggle('is-current', n === Math.min(step, 5));
-            el.classList.toggle('is-done', n < Math.min(step, 5));
-        });
-        const progress = root.querySelector('.checkin-progress');
-        progress?.setAttribute('aria-valuenow', String(Math.min(step, 5)));
-        root.querySelector('.checkin-sheet')?.setAttribute('data-current-step', String(step));
-
-        const copy = stepCopy[step];
-        root.querySelector('#checkin-step-label').textContent = copy.label;
+    function showForm() {
+        complete = false;
+        root.classList.remove('checkin-complete');
+        fieldsEl?.classList.remove('hidden');
+        if (fieldsEl) {
+            fieldsEl.hidden = false;
+            fieldsEl.removeAttribute('aria-hidden');
+        }
+        successEl?.classList.add('hidden');
+        if (successEl) {
+            successEl.hidden = true;
+        }
+        root.querySelector('.checkin-sheet')?.setAttribute('data-mode', 'form');
+        const label = root.querySelector('#checkin-step-label');
+        if (label) {
+            label.textContent = 'One page';
+        }
         const title = root.querySelector('#checkin-title');
-        title.textContent = step < 6 ? copy.title : 'You’re checked in';
-        if (stepHasRendered) title.focus({ preventScroll: true });
-        stepHasRendered = true;
-
-        backBtn.classList.toggle('hidden', step === 1 || step === 6);
+        if (title) {
+            title.textContent = 'Check in';
+        }
         nextBtn.disabled = false;
-        nextBtn.textContent = hasPrizeReceipt() && step === 6
-            ? 'Keep this screen open'
-            : copy.next;
-        nextBtn.classList.toggle('hidden', hasPrizeReceipt() && step === 6);
-        root.querySelector('.checkin-actions')?.classList.toggle('checkin-actions--done', hasPrizeReceipt() && step === 6);
+        nextBtn.textContent = submitLabel;
+        nextBtn.classList.remove('hidden');
+        nextBtn.setAttribute('type', 'submit');
+        root.querySelector('.checkin-actions')?.classList.remove('checkin-actions--done');
+    }
+
+    function showSuccess() {
+        complete = true;
+        root.classList.add('checkin-complete');
+        setMapExpanded(false);
+        fieldsEl?.classList.add('hidden');
+        if (fieldsEl) {
+            fieldsEl.hidden = true;
+            fieldsEl.setAttribute('aria-hidden', 'true');
+        }
+        successEl?.classList.remove('hidden');
+        if (successEl) {
+            successEl.hidden = false;
+        }
+        root.querySelector('.checkin-sheet')?.setAttribute('data-mode', 'success');
+        const label = root.querySelector('#checkin-step-label');
+        if (label) {
+            label.textContent = 'Done';
+        }
+        const title = root.querySelector('#checkin-title');
+        if (title) {
+            title.textContent = 'You’re checked in';
+            title.focus({ preventScroll: true });
+        }
+        nextBtn.disabled = false;
+        nextBtn.textContent = hasPrizeReceipt() ? 'Keep this screen open' : 'Back to the map';
+        nextBtn.setAttribute('type', 'button');
+        nextBtn.classList.toggle('hidden', hasPrizeReceipt());
+        root.querySelector('.checkin-actions')?.classList.toggle('checkin-actions--done', hasPrizeReceipt());
 
         const sheet = root.querySelector('.checkin-sheet');
         if (sheet) {
             sheet.scrollTop = 0;
         }
         root.scrollTop = 0;
-
-        if (step === 4) {
-            setLocationStatus('Opening the map…', 'busy');
-            prepareLocationStep();
-        } else {
-            setMapExpanded(false);
-        }
     }
 
     async function searchCompanies(query) {
@@ -506,7 +532,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
                 <li class="company-suggest-custom">
                     <button type="button" data-custom="1">
                         <strong>Use “${escapeHtml(query)}”</strong>
-                        <small>${rows.length ? 'Not in the list? That’s fine — place a pin next.' : 'Not listed — that’s perfectly fine. You’ll place a pin next.'}</small>
+                        <small>${rows.length ? 'Not in the list? That’s fine — drop a pin on the map below.' : 'Not listed — that’s fine. Drop a pin on the map below.'}</small>
                     </button>
                 </li>
             `;
@@ -514,7 +540,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
                 <li>
                     <button type="button" data-company-index="${index}">
                         <strong>${escapeHtml(row.name)}</strong>
-                        <small>${escapeHtml(row.location || 'Malaysia')}${row.has_location ? '' : ' · place on map next'}</small>
+                        <small>${escapeHtml(row.location || 'Malaysia')}${row.has_location ? '' : ' · drop a pin below'}</small>
                     </button>
                 </li>
             `).join('');
@@ -565,9 +591,13 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         if (company.has_location && company.latitude != null && company.longitude != null) {
             form.querySelector('[name="latitude"]').value = Number(company.latitude).toFixed(7);
             form.querySelector('[name="longitude"]').value = Number(company.longitude).toFixed(7);
+            prepareLocationStep();
         } else {
             form.querySelector('[name="latitude"]').value = '';
             form.querySelector('[name="longitude"]').value = '';
+            if (locationBanner) {
+                locationBanner.hidden = true;
+            }
         }
     }
 
@@ -589,13 +619,13 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
                     || 'Looks good — adjust anytime on the map.';
             }
             if (locationHelp) {
-                locationHelp.textContent = 'We found your company’s pin. Confirm it, or search or drag to move it.';
+                locationHelp.textContent = 'We found your company’s pin. Hold the avatar and drag it if you need to move it.';
             }
             root.querySelector('.location-details')?.setAttribute('open', '');
         } else {
             if (locationBanner) locationBanner.hidden = true;
             if (locationHelp) {
-                locationHelp.textContent = 'Search a place, use this phone’s location, or tap the map.';
+                locationHelp.textContent = 'Search, use this phone, or tap the map. Then hold the avatar and drag it.';
             }
         }
     }
@@ -612,7 +642,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 setPin(position.coords.longitude, position.coords.latitude, { reverse: true, fly: true });
-                setLocationStatus('Pin placed from this phone. Drag your avatar to fine-tune.', 'ok');
+                setLocationStatus('Pin placed from this phone. Hold the avatar and drag it to the exact spot.', 'ok');
                 hideError();
             },
             () => {
@@ -650,6 +680,10 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             center: [101.9758, 4.2105],
             zoom: 5.4,
             attributionControl: false,
+            dragRotate: false,
+            pitchWithRotate: false,
+            touchPitch: false,
+            cooperativeGestures: false,
         });
 
         checkinMap.addControl(new gl.NavigationControl({ showCompass: false }), 'top-right');
@@ -658,7 +692,8 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         });
         checkinMap.on('click', (event) => {
             if (locationBanner) locationBanner.hidden = true;
-            setPin(event.lngLat.lng, event.lngLat.lat, { reverse: true, fly: false });
+            setPin(event.lngLat.lng, event.lngLat.lat, { reverse: true, fly: true });
+            setLocationStatus('Pin dropped. Hold the avatar and drag it with your finger.', 'ok');
         });
         checkinMap.on('load', () => {
             const lat = form.querySelector('[name="latitude"]').value;
@@ -692,22 +727,35 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
 
         if (! pinMarker) {
             const el = document.createElement('div');
-            el.className = 'avatar-marker avatar-marker--pop';
+            el.className = 'avatar-marker avatar-marker--pop avatar-marker--checkin';
             el.innerHTML = `
+                <span class="avatar-marker-grip">Hold &amp; drag</span>
                 <span class="avatar-marker-face">
-                    <img src="${currentAvatarSrc()}" alt="" width="46" height="46">
+                    <img src="${currentAvatarSrc()}" alt="" width="72" height="72">
                 </span>
                 <span class="avatar-marker-tip" aria-hidden="true"></span>
             `;
-            pinMarker = new maplibregl.Marker({ element: el, anchor: 'bottom', draggable: true })
+            pinMarker = new maplibregl.Marker({
+                element: el,
+                anchor: 'bottom',
+                draggable: true,
+                clickTolerance: 24,
+                pitchAlignment: 'viewport',
+                rotationAlignment: 'viewport',
+            })
                 .setLngLat([longitude, latitude])
                 .addTo(checkinMap);
 
+            pinMarker.on('dragstart', () => {
+                el.classList.add('is-dragging');
+            });
             pinMarker.on('dragend', () => {
+                el.classList.remove('is-dragging');
                 const pos = pinMarker.getLngLat();
                 form.querySelector('[name="longitude"]').value = pos.lng.toFixed(7);
                 form.querySelector('[name="latitude"]').value = pos.lat.toFixed(7);
                 reverseGeocode(pos.lng, pos.lat);
+                setLocationStatus('Pin moved. Let go when the spot looks right.', 'ok');
             });
         } else {
             syncPinPreview();
@@ -717,8 +765,8 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         if (fly) {
             checkinMap.easeTo({
                 center: [longitude, latitude],
-                zoom: Math.max(checkinMap.getZoom(), 8.5),
-                duration: 700,
+                zoom: Math.max(checkinMap.getZoom(), 14.2),
+                duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 500,
             });
         }
         if (reverse) reverseGeocode(longitude, latitude);
@@ -782,7 +830,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         if (locationBanner) locationBanner.hidden = true;
         renderLocationRows([]);
         if (locationQuery) locationQuery.value = result.name || String(result.label || '').split(',')[0];
-        setLocationStatus(`Pin placed at ${result.label}. Drag your avatar to fine-tune.`, 'ok');
+        setLocationStatus(`Pin placed at ${result.label}. Hold the avatar and drag it to fine-tune.`, 'ok');
         hideError();
         checkinMap?.getContainer().scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
@@ -830,58 +878,43 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         form.querySelector('[name="address_text"]').value = result.address_text || result.label || '';
     }
 
-    function validateStep(current) {
-        if (current === 1) {
-            if (! form.full_name.value.trim()) {
-                showError('Add your name so the booth team can greet you.', form.full_name);
-                return false;
-            }
-            if (! form.email.value.trim() && ! form.phone.value.trim()) {
-                showError('Add an email or a phone number — one is enough.', [form.email, form.phone]);
-                return false;
-            }
-            if (form.email.value.trim() && ! form.email.checkValidity()) {
-                showError('That email looks incomplete — check for a typo, e.g. name@company.my.', form.email);
-                return false;
-            }
-            return true;
+    function validateForm() {
+        if (! form.full_name.value.trim()) {
+            showError('Add your name so the booth team can greet you.', form.full_name);
+            return false;
         }
-        if (current === 2) {
-            if (! form.company_name.value.trim()) {
-                showError('Add your company — pick one from the list or type it in.', form.company_name);
-                return false;
-            }
-            const website = form.public_website.value.trim();
-            if (website && ! isHttpWebsite(website)) {
-                showError('Add a website like company.com or https://company.com — or leave it blank.', form.public_website);
-                return false;
-            }
-            return true;
+        if (! form.email.value.trim() && ! form.phone.value.trim()) {
+            showError('Add an email or a phone number — one is enough.', [form.email, form.phone]);
+            return false;
         }
-        if (current === 3) {
-            if (! form.querySelectorAll('input[name="services[]"]:checked').length) {
-                showError('Choose at least one topic you’d like to hear about.');
-                return false;
-            }
-            if (otherInterestSelected() && ! otherInterestInput()?.value.trim()) {
-                showError('Type the interest you have in mind.', otherInterestInput());
-                return false;
-            }
-            return true;
+        if (form.email.value.trim() && ! form.email.checkValidity()) {
+            showError('That email looks incomplete — check for a typo, e.g. name@company.my.', form.email);
+            return false;
         }
-        if (current === 4) {
-            if (! form.latitude.value || ! form.longitude.value) {
-                showError('Search for a place or tap the map to drop your pin.', locationQuery);
-                return false;
-            }
-            return true;
+        if (! form.company_name.value.trim()) {
+            showError('Add your company — pick one from the list or type it in.', form.company_name);
+            return false;
         }
-        if (current === 5) {
-            if (! form.privacy_accepted.checked) {
-                showError('Please confirm you’ve read the privacy note to continue.', form.privacy_accepted);
-                return false;
-            }
-            return true;
+        const website = form.public_website.value.trim();
+        if (website && ! isHttpWebsite(website)) {
+            showError('Add a website like company.com or https://company.com — or leave it blank.', form.public_website);
+            return false;
+        }
+        if (! form.querySelectorAll('input[name="services[]"]:checked').length) {
+            showError('Choose at least one topic you’d like to hear about.', interestOptions);
+            return false;
+        }
+        if (otherInterestSelected() && ! otherInterestInput()?.value.trim()) {
+            showError('Type the interest you have in mind.', otherInterestInput());
+            return false;
+        }
+        if (! form.latitude.value || ! form.longitude.value) {
+            showError('Search for a place or tap the map to drop your pin.', locationQuery);
+            return false;
+        }
+        if (! form.privacy_accepted.checked) {
+            showError('Please confirm you’ve read the privacy note to continue.', form.privacy_accepted);
+            return false;
         }
         return true;
     }
@@ -898,7 +931,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             } catch (error) {
                 showError(error?.message || 'Please upload a JPG, PNG or WebP photo.');
                 nextBtn.disabled = false;
-                nextBtn.textContent = stepCopy[5].next;
+                nextBtn.textContent = submitLabel;
                 submitting = false;
                 return;
             }
@@ -919,7 +952,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             longitude: form.longitude.value,
             public_website: normalizeWebsite(form.public_website.value),
             display_message: form.display_message?.value.trim() || '',
-            public_display_enabled: form.public_display_enabled.checked,
+            public_display_enabled: true,
             follow_up_consent: form.follow_up_consent.checked,
             privacy_accepted: form.privacy_accepted.checked,
             services: serviceIds,
@@ -968,12 +1001,10 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
                 }
             } else {
                 root.querySelector('#success-title').textContent = 'Looking good!';
-                root.querySelector('#success-copy').textContent = result.public_display_enabled
-                    ? 'Your avatar is popping onto the Malaysia map.'
-                    : 'You’re checked in privately — still glad you came!';
+                root.querySelector('#success-copy').textContent = 'Your avatar is popping onto the Malaysia map.';
             }
 
-            goTo(6);
+            showSuccess();
             await onSuccess?.(result);
         } catch (error) {
             const messages = error.payload?.errors
@@ -981,7 +1012,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
                 : error.message;
             showError(messages || 'That didn’t go through — try once more.');
             nextBtn.disabled = false;
-            nextBtn.textContent = stepCopy[5].next;
+            nextBtn.textContent = submitLabel;
             submitting = false;
         }
     }

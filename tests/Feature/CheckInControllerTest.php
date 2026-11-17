@@ -119,6 +119,35 @@ class CheckInControllerTest extends TestCase
             ->assertSee('Type anything', false);
     }
 
+    public function test_check_in_always_shows_the_avatar_on_the_map(): void
+    {
+        $this->postJson('/api/check-in', $this->payload([
+            'services' => [$this->gisService()->id],
+            'public_display_enabled' => '0',
+        ]))->assertCreated();
+
+        $this->assertTrue((bool) Company::query()->latest('id')->first()?->public_display_enabled);
+    }
+
+    public function test_check_in_page_shows_the_full_form_on_one_page(): void
+    {
+        $this->gisService();
+
+        $this->get(route('check-in'))
+            ->assertOk()
+            ->assertSee('name="full_name"', false)
+            ->assertSee('name="company_name"', false)
+            ->assertSee('name="services[]"', false)
+            ->assertSee('name="privacy_accepted"', false)
+            ->assertSee('id="checkin-map"', false)
+            ->assertSee('Join the map', false)
+            ->assertSee('Your avatar always appears on the live booth map.', false)
+            ->assertDontSee('Show my avatar on the live booth map', false)
+            ->assertDontSee('id="checkin-back"', false)
+            ->assertDontSee('Step 1 of 5', false)
+            ->assertDontSee('Continue', false);
+    }
+
     public function test_staff_visitors_page_escapes_typed_other_interest(): void
     {
         $other = $this->otherService();

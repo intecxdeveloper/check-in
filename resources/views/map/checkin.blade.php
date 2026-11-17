@@ -29,10 +29,10 @@
         >
         <div class="aiva-greeting">
             @include('partials.aiva', ['pose' => 'wave', 'size' => 56, 'loading' => 'eager', 'class' => 'aiva-greeting-img'])
-            <p class="aiva-bubble"><strong>Hi, I’m Aiva.</strong> About a minute — then show your receipt at the counter.</p>
+            <p class="aiva-bubble"><strong>Hi, I’m Aiva.</strong> One page — then show your receipt at the counter.</p>
         </div>
         <h1>Join the Malaysia map</h1>
-        <p>Five short steps. Your name stays private. The pin is only for the booth map.</p>
+        <p>Your name stays private. The pin is only for the booth map.</p>
     </div>
 
     <div id="company-card" class="company-card hidden" hidden></div>
@@ -45,28 +45,13 @@
     <span data-stat="regions" class="hidden" hidden>0</span>
 
     <div id="checkin-modal" class="checkin-modal checkin-modal-page" role="dialog" aria-modal="true" aria-labelledby="checkin-title">
-        <div class="checkin-sheet">
+        <div class="checkin-sheet" data-mode="form">
             <div class="checkin-header">
                 <div>
-                    <p class="checkin-eyebrow" id="checkin-step-label" aria-live="polite">Step 1 of 5</p>
-                    <h2 id="checkin-title" tabindex="-1">About you</h2>
+                    <p class="checkin-eyebrow" id="checkin-step-label" aria-live="polite">One page</p>
+                    <h2 id="checkin-title" tabindex="-1">Check in</h2>
                 </div>
             </div>
-
-            <div class="checkin-progress" role="progressbar" aria-label="Check-in progress" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1">
-                <span data-step-dot="1" class="active current"></span>
-                <span data-step-dot="2"></span>
-                <span data-step-dot="3"></span>
-                <span data-step-dot="4"></span>
-                <span data-step-dot="5"></span>
-            </div>
-            <ol class="checkin-step-names" aria-hidden="true">
-                <li data-step-name="1">You</li>
-                <li data-step-name="2">Company</li>
-                <li data-step-name="3">Interests</li>
-                <li data-step-name="4">Place</li>
-                <li data-step-name="5">Join</li>
-            </ol>
 
             @include('map.partials.checkin-form', ['privacyVersion' => $privacyVersion, 'showPrizeReceipt' => true, 'services' => $services])
         </div>
