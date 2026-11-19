@@ -64,14 +64,6 @@
     background: linear-gradient(180deg, #dbeafe 0%, #f4f6fa 55%, #e8e8ed 100%);
 }
 
-.expo-vignette {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background: linear-gradient(180deg, rgba(245, 245, 247, 0.28) 0%, transparent 12%, transparent 88%, rgba(245, 245, 247, 0.18) 100%);
-}
-
 .expo-overlay {
     position: absolute;
     inset: 0;
@@ -437,6 +429,101 @@
     color: #5c5c62;
     font-size: 0.82rem;
     font-weight: 650;
+}
+
+.expo-basemap {
+    position: absolute;
+    left: 50%;
+    bottom: clamp(0.85rem, 2vw, 1.25rem);
+    z-index: 3;
+    display: flex;
+    gap: 0.2rem;
+    padding: 0.22rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(14px);
+    transform: translateX(-50%);
+}
+
+.expo-basemap button {
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-navy);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    min-height: 2rem;
+    padding: 0.45rem 0.85rem;
+    cursor: pointer;
+}
+
+.expo-basemap button.is-active {
+    background: var(--color-navy);
+    color: #fff;
+}
+
+.expo-basemap button[data-basemap="nadi"].is-active {
+    background: #07111c;
+    color: #fff;
+    box-shadow: inset 3px 0 0 var(--color-red);
+}
+
+.road-pulse {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.road-pulse-dot {
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: #e4232e;
+    box-shadow:
+        0 0 6px 1px rgba(228, 35, 46, 0.95),
+        0 0 16px 5px rgba(196, 18, 48, 0.55);
+}
+
+.road-pulse-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 70, 80, 0.85);
+    box-shadow: 0 0 12px rgba(228, 35, 46, 0.7);
+    animation: road-pulse 1.7s ease-out infinite;
+}
+
+@keyframes road-pulse {
+    0% { transform: scale(0.55); opacity: 0.9; }
+    100% { transform: scale(2.15); opacity: 0; }
+}
+
+.expo-basemap--map {
+    position: absolute;
+    left: 0.45rem;
+    bottom: 0.45rem;
+    z-index: 2;
+    transform: none;
+}
+
+.checkin-map {
+    position: relative;
+}
+
+.expo-basemap--map button {
+    min-height: 1.75rem;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.72rem;
 }
 
 .expo-qr {
@@ -1715,6 +1802,14 @@ body.checkin-map-is-expanded .checkin-actions {
         display: none;
     }
 
+    .expo-basemap:not(.expo-basemap--map) {
+        left: auto;
+        right: 0.75rem;
+        top: 0.75rem;
+        bottom: auto;
+        transform: none;
+    }
+
     .expo-pulse {
         top: auto;
         right: 0.75rem;
@@ -2444,5 +2539,251 @@ body.checkin-map-is-expanded .checkin-actions {
 @media (prefers-reduced-motion: reduce) {
     .gift-wheel.is-spinning {
         transition: none;
+    }
+}
+
+/* ---------- Business card gallery + phone capture ---------- */
+.card-qr-frame {
+    display: grid;
+    place-items: center;
+    padding: 0.85rem;
+    border-radius: 1.25rem;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px rgba(0, 37, 78, 0.08);
+}
+
+.card-qr-frame canvas,
+.card-qr-frame img {
+    display: block;
+    width: 220px;
+    height: 220px;
+    border-radius: 0.75rem;
+}
+
+.card-coverflow {
+    margin-top: 0.75rem;
+    outline: none;
+}
+
+.card-coverflow-stage {
+    position: relative;
+    height: min(22rem, 56vw);
+    min-height: 16rem;
+    perspective: 1400px;
+    transform-style: preserve-3d;
+    overflow: hidden;
+}
+
+.card-coverflow-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    margin: 0;
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--color-mute);
+    font-size: 0.9rem;
+}
+
+.card-coverflow-item {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(22rem, 72%);
+    aspect-ratio: 1.75 / 1;
+    margin: 0;
+    overflow: hidden;
+    border-radius: 1.15rem;
+    background: #0a3566;
+    box-shadow: 0 18px 40px rgba(0, 37, 78, 0.22);
+    transform: translate(-50%, -50%)
+        translateX(calc(var(--offset) * 42%))
+        translateZ(calc(abs(var(--offset)) * -72px))
+        rotateY(calc(var(--offset) * -32deg))
+        scale(calc(1 - min(abs(var(--offset)) * 0.1, 0.35)));
+    opacity: calc(1 - min(abs(var(--offset)) * 0.32, 0.92));
+    z-index: calc(24 - abs(var(--offset)) * 2);
+    transition: transform 480ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 480ms ease;
+    cursor: pointer;
+}
+
+.card-coverflow-item[data-active='true'] {
+    box-shadow: 0 24px 50px rgba(0, 37, 78, 0.32);
+}
+
+.card-coverflow-item img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.card-coverflow-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.85rem;
+}
+
+.card-coverflow-nav {
+    width: 2.4rem;
+    height: 2.4rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-navy);
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.card-coverflow-count {
+    min-width: 4.5rem;
+    margin: 0;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-mute);
+}
+
+.card-coverflow-caption {
+    margin-top: 0.85rem;
+    text-align: center;
+}
+
+.card-coverflow-name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--color-navy);
+}
+
+.card-coverflow-meta {
+    margin: 0.2rem 0 0;
+    color: var(--color-mute);
+    font-size: 0.82rem;
+}
+
+.card-scan-body {
+    margin: 0;
+    min-height: 100dvh;
+    background: #071422;
+    color: #edf3fb;
+}
+
+.card-scan {
+    display: grid;
+    grid-template-rows: auto 1fr auto auto;
+    min-height: 100dvh;
+    padding: max(0.75rem, env(safe-area-inset-top)) 1rem max(1.25rem, env(safe-area-inset-bottom));
+}
+
+.card-scan-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.card-scan-top p {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 650;
+    color: rgba(237, 243, 251, 0.72);
+}
+
+.card-scan-view {
+    position: relative;
+    margin: 1rem 0;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    background: #000;
+    min-height: 18rem;
+}
+
+.card-scan-view video,
+.card-scan-view img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 18rem;
+    object-fit: cover;
+}
+
+.card-scan-frame {
+    position: absolute;
+    inset: 12% 8%;
+    border: 2px solid rgba(255, 255, 255, 0.88);
+    border-radius: 1rem;
+    box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.28);
+    pointer-events: none;
+}
+
+.card-scan-status {
+    margin: 0 0 1rem;
+    min-height: 2.6rem;
+    text-align: center;
+    font-size: 0.92rem;
+    font-weight: 650;
+}
+
+.card-scan-dock {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.card-scan-roll {
+    justify-self: start;
+    margin: 0;
+    padding: 0.55rem 0.85rem;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.card-scan-roll:nth-of-type(2),
+#card-retake {
+    justify-self: end;
+}
+
+.card-scan-roll input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+}
+
+.card-scan-shutter {
+    width: 4.4rem;
+    height: 4.4rem;
+    border: 3px solid #fff;
+    border-radius: 999px;
+    background: transparent;
+    padding: 0;
+}
+
+.card-scan-shutter span {
+    display: block;
+    width: 3.35rem;
+    height: 3.35rem;
+    margin: auto;
+    border-radius: 999px;
+    background: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card-coverflow-item {
+        transition: none;
+        transform: translate(-50%, -50%) translateX(calc(var(--offset) * 48%));
     }
 }

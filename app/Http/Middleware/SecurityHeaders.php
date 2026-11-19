@@ -25,7 +25,7 @@ class SecurityHeaders
             $headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
 
-        if ($request->is('staff', 'staff/*')) {
+        if ($request->is('staff', 'staff/*', 'scan', 'scan/*')) {
             // Lead data must never sit in shared or browser caches.
             $headers->set('Cache-Control', 'no-store, private');
             $headers->set('X-Robots-Tag', 'noindex, nofollow');

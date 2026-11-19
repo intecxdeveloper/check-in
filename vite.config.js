@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/map.js', 'resources/js/checkin.js'],
+            input: ['resources/css/app.css', 'resources/js/map.js', 'resources/js/checkin.js', 'resources/js/card-gallery.js', 'resources/js/card-capture.js'],
             refresh: true,
             fonts: [
                 bunny('Plus Jakarta Sans', {

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Staff\VisitorController;
+use App\Models\BusinessCardScanSession;
 use App\Models\Company;
 use App\Models\Lead;
 use App\Models\Service;
@@ -12,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class SecurityTest extends TestCase
@@ -63,6 +65,8 @@ class SecurityTest extends TestCase
     {
         $this->get('/staff')->assertRedirect('/staff/login');
         $this->get('/staff/visitors')->assertRedirect('/staff/login');
+        $this->get('/staff/cards')->assertRedirect('/staff/login');
+        $this->get('/staff/cards/feed')->assertRedirect('/staff/login');
         $this->get('/staff/gifts')->assertRedirect('/staff/login');
         $this->get('/staff/export')->assertRedirect('/staff/login');
         $visitor = $this->makeVisitor(true);
@@ -186,6 +190,12 @@ class SecurityTest extends TestCase
             ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
         $this->actingAs(User::factory()->create())->get('/staff')
+            ->assertOk()
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+
+        $token = Str::lower(Str::random(32));
+        BusinessCardScanSession::factory()->withToken($token)->create();
+        $this->get('/scan/'.$token)
             ->assertOk()
             ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
     }

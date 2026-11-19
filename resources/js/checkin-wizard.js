@@ -1,5 +1,6 @@
 import { avatarUrl } from './avatars';
 import { loadMapLibre } from './maplibre';
+import { markBasemapButtons, readBasemapId, resolveBasemapStyle, storeBasemapId } from './nadi-basemap';
 
 export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services, onSuccess, lockOpen = false }) {
     let maplibregl = loadedMapLibre;
@@ -23,6 +24,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
     let submitting = false;
     let companySearchTimer = null;
     let companySearchAbort = null;
+    let activeBasemap = readBasemapId();
     let reverseTimer = null;
     let selectedCompany = null;
 
@@ -78,6 +80,20 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         if (button) pickLocation(Number(button.dataset.resultIndex));
     });
     root.querySelector('#location-gps-btn')?.addEventListener('click', useDeviceLocation);
+    markBasemapButtons(root, activeBasemap);
+    root.querySelector('#checkin-basemap')?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-basemap]');
+        if (! button) {
+            return;
+        }
+        switchCheckinBasemap(button.dataset.basemap).catch((error) => console.warn('Basemap switch failed', error));
+    });
+    window.addEventListener('nadi:basemap', (event) => {
+        if (event.detail?.source === 'checkin') {
+            return;
+        }
+        switchCheckinBasemap(event.detail?.id, { broadcast: false }).catch((error) => console.warn('Basemap switch failed', error));
+    });
 
     companyInput?.addEventListener('input', () => {
         selectedCompany = null;
@@ -510,6 +526,24 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
         );
     }
 
+    async function switchCheckinBasemap(id, { broadcast = true } = {}) {
+        if ((id !== 'liberty' && id !== 'nadi') || (id === activeBasemap && checkinMap)) {
+            return;
+        }
+
+        const style = await resolveBasemapStyle(id, root.dataset.mapStyle);
+        activeBasemap = id;
+        storeBasemapId(id);
+        markBasemapButtons(root, id);
+        if (checkinMap) {
+            checkinMap.setStyle(style, { diff: false });
+            checkinMap.getContainer().style.background = id === 'nadi' ? '#07111c' : '';
+        }
+        if (broadcast) {
+            window.dispatchEvent(new CustomEvent('nadi:basemap', { detail: { id, source: 'checkin' } }));
+        }
+    }
+
     async function ensureCheckinMap() {
         if (checkinMap) {
             checkinMap.resize();
@@ -532,9 +566,20 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             return;
         }
 
+        let style = root.dataset.mapStyle;
+        if (activeBasemap === 'nadi') {
+            try {
+                style = await resolveBasemapStyle('nadi', root.dataset.mapStyle);
+            } catch (error) {
+                console.warn('NADI basemap unavailable', error);
+                activeBasemap = 'liberty';
+            }
+        }
+        markBasemapButtons(root, activeBasemap);
+
         checkinMap = new gl.Map({
             container: 'checkin-map',
-            style: root.dataset.mapStyle,
+            style,
             center: [101.9758, 4.2105],
             zoom: 5.4,
             attributionControl: false,
@@ -544,6 +589,7 @@ export function createCheckInWizard({ root, maplibregl: loadedMapLibre, services
             cooperativeGestures: false,
         });
 
+        checkinMap.getContainer().style.background = activeBasemap === 'nadi' ? '#07111c' : '';
         checkinMap.addControl(new gl.NavigationControl({ showCompass: false }), 'top-right');
         checkinMap.on('style.load', () => {
             try { checkinMap.setProjection({ type: 'mercator' }); } catch (_) {}

@@ -6,6 +6,8 @@ return [
     'brand_mark' => 'images/nadi-spatial-mark.png',
 
     'privacy_notice_version' => env('EXPO_PRIVACY_VERSION', '1.0'),
+    // Public origin encoded in booth and phone QR codes.
+    'public_url' => env('EXPO_PUBLIC_URL', 'https://scan.nadispatial.com'),
     'geocoder_user_agent' => env(
         'EXPO_GEOCODER_USER_AGENT',
         'ExpoVisitorMap/1.0 (booth check-in)'

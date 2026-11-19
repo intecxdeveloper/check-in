@@ -23,7 +23,6 @@
     <a class="skip-link" href="{{ route('check-in') }}">Skip to check-in</a>
 
     <div id="map" class="expo-map" role="application" aria-label="Live visitor map of Malaysia"></div>
-    <div class="expo-vignette" aria-hidden="true"></div>
     <p id="map-loading" class="map-loading" role="status">Opening the Malaysia map…</p>
 
     <div class="expo-overlay pointer-events-none">
@@ -71,6 +70,11 @@
                 <li class="expo-ticker-empty"><small>Be the first pin on the map.</small></li>
             </ul>
         </aside>
+
+        <div id="expo-basemap" class="expo-basemap pointer-events-auto" role="group" aria-label="Basemap">
+            <button type="button" data-basemap="liberty" class="is-active" aria-pressed="true">Street</button>
+            <button type="button" data-basemap="nadi" aria-pressed="false">NADI</button>
+        </div>
 
         <aside class="expo-qr pointer-events-auto">
             <canvas id="checkin-qr" width="148" height="148" aria-label="QR code for check-in"></canvas>

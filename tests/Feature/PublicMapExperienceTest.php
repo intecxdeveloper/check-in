@@ -59,7 +59,10 @@ class PublicMapExperienceTest extends TestCase
             ->assertSee('Gift wheel', false)
             ->assertSee('Spin for a gift', false)
             ->assertSee('id="gift-modal"', false)
-            ->assertSee('maplibre-gl.js', false);
+            ->assertSee('maplibre-gl.js', false)
+            ->assertSee('id="expo-basemap"', false)
+            ->assertSee('data-basemap="nadi"', false)
+            ->assertSee('>NADI<', false);
     }
 
     public function test_check_in_page_skips_the_booth_map_bundle(): void

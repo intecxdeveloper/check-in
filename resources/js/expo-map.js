@@ -1,5 +1,6 @@
 import { createCheckInWizard } from './checkin-wizard';
 import { avatarUrl, resolveAvatarUrl } from './avatars';
+import { markBasemapButtons, readBasemapId, resolveBasemapStyle, skyForBasemap, storeBasemapId, syncRoadFlow } from './nadi-basemap';
 
 export function createExpoMap(root, maplibregl) {
     const mapStyle = root.dataset.mapStyle;
@@ -28,6 +29,7 @@ export function createExpoMap(root, maplibregl) {
     let recentBootstrapped = false;
     let toastTimer = null;
     let toastLeaveTimer = null;
+    let activeBasemap = readBasemapId();
 
     const statsEls = {
         check_ins: root.querySelector('[data-stat="check_ins"]'),
@@ -203,24 +205,67 @@ export function createExpoMap(root, maplibregl) {
         }
 
         try {
-            map.setSky({
-                'sky-color': '#b9dcff',
-                'sky-horizon-blend': 0.55,
-                'horizon-color': '#f5f7fa',
-                'horizon-fog-blend': 0.85,
-                'fog-color': '#ffffff',
-                'fog-ground-blend': 0.35,
-            });
+            map.setSky(skyForBasemap(activeBasemap));
         } catch (_) {
             // Sky is optional for pitched views.
         }
+
+        const canvas = map.getContainer();
+        if (canvas) {
+            canvas.style.background = activeBasemap === 'nadi' ? '#07111c' : '';
+        }
+
+        try {
+            syncRoadFlow(map, activeBasemap);
+        } catch (error) {
+            console.warn('Road flow unavailable', error);
+        }
     }
 
-    function initMap() {
+    async function switchBasemap(id) {
+        if (! map || id === activeBasemap || (id !== 'liberty' && id !== 'nadi')) {
+            return;
+        }
+
+        const style = await resolveBasemapStyle(id, mapStyle);
+        activeBasemap = id;
+        storeBasemapId(id);
+        markBasemapButtons(root, id);
+        map.setStyle(style, { diff: false });
+        window.dispatchEvent(new CustomEvent('nadi:basemap', { detail: { id, source: 'expo' } }));
+    }
+
+    async function initMap() {
+        markBasemapButtons(root, activeBasemap);
+        root.querySelector('#expo-basemap')?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-basemap]');
+            if (! button) {
+                return;
+            }
+            switchBasemap(button.dataset.basemap).catch((error) => console.warn('Basemap switch failed', error));
+        });
+        window.addEventListener('nadi:basemap', (event) => {
+            if (event.detail?.source === 'expo') {
+                return;
+            }
+            switchBasemap(event.detail?.id).catch((error) => console.warn('Basemap switch failed', error));
+        });
+
+        let style = mapStyle;
+        if (activeBasemap === 'nadi') {
+            try {
+                style = await resolveBasemapStyle('nadi', mapStyle);
+            } catch (error) {
+                console.warn('NADI basemap unavailable', error);
+                activeBasemap = 'liberty';
+                markBasemapButtons(root, activeBasemap);
+            }
+        }
+
         // Mercator OSM scene. DOM pins stay locked via map.project().
         map = new maplibregl.Map({
             container: 'map',
-            style: mapStyle,
+            style,
             center: startCenter,
             zoom: startZoom,
             pitch: 0,

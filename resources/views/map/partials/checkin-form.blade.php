@@ -62,7 +62,12 @@
                     <p id="location-status" class="location-status" role="status" aria-live="polite" hidden></p>
                 </div>
                 <ul id="location-results" class="location-results" role="listbox" aria-label="Matching places" hidden></ul>
-                <div id="checkin-map" class="checkin-map" role="application" aria-label="Map of Malaysia"></div>
+                <div id="checkin-map" class="checkin-map" role="application" aria-label="Map of Malaysia">
+                    <div id="checkin-basemap" class="expo-basemap expo-basemap--map" role="group" aria-label="Basemap">
+                        <button type="button" data-basemap="liberty" class="is-active" aria-pressed="true">Street</button>
+                        <button type="button" data-basemap="nadi" aria-pressed="false">NADI</button>
+                    </div>
+                </div>
             </div>
             <input type="hidden" name="latitude">
             <input type="hidden" name="longitude">
