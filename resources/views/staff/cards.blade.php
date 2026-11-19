@@ -64,50 +64,68 @@
     </section>
 </div>
 
-<section class="mt-6 rounded-2xl border border-black/[0.06] bg-white p-5" aria-labelledby="card-table-heading">
-    <h2 id="card-table-heading" class="text-base font-bold text-navy">Recorded details</h2>
-    <p class="mt-1 text-sm text-mute">Correct anything OCR missed. These rows stay on the staff desk; they are not shown on the live map.</p>
+<section id="card-table" class="mt-6 rounded-2xl border border-black/[0.06] bg-white p-5" aria-labelledby="card-table-heading" data-per-page="{{ $tableCards->perPage() }}" data-page="{{ $tableCards->currentPage() }}">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h2 id="card-table-heading" class="text-base font-bold text-navy">Recorded details</h2>
+            <p class="mt-1 max-w-xl text-sm text-mute">Correct anything OCR missed. The row for the card in the center of the slider is highlighted. These rows stay on the staff desk; they are not shown on the live map.</p>
+        </div>
+        <p id="card-table-summary" class="text-xs font-semibold text-mute">
+            @if ($tableCards->total() > 0)
+                {{ $tableCards->firstItem() }}–{{ $tableCards->lastItem() }} of {{ $tableCards->total() }}
+            @endif
+        </p>
+    </div>
 
-    <div class="mt-4 overflow-x-auto">
-        <table class="w-full min-w-[52rem] border-collapse text-sm">
+    <div id="card-table-list" class="mt-4">
+        <table class="card-table">
             <thead>
                 <tr class="border-b border-black/[0.06] text-left text-xs font-semibold text-mute">
-                    <th class="py-2 pr-3">Card</th>
-                    <th class="py-2 pr-3">Name</th>
-                    <th class="py-2 pr-3">Title</th>
-                    <th class="py-2 pr-3">Company</th>
-                    <th class="py-2 pr-3">Email</th>
-                    <th class="py-2 pr-3">Phone</th>
-                    <th class="py-2 pr-3">Notes</th>
-                    <th class="py-2"></th>
+                    <th scope="col" class="card-table-num">#</th>
+                    <th scope="col" class="card-table-photo">Card</th>
+                    <th scope="col">
+                        <div class="card-table-fields">
+                            <span>Name</span>
+                            <span>Title</span>
+                            <span>Company</span>
+                            <span>Email</span>
+                            <span>Phone</span>
+                            <span>Notes</span>
+                        </div>
+                    </th>
                 </tr>
             </thead>
             <tbody id="card-table-body">
                 @forelse ($tableCards as $card)
-                    <tr class="border-b border-black/[0.04] align-top" data-card-row="{{ $card->id }}">
-                        <td class="py-3 pr-3">
+                    <tr class="border-b border-black/[0.04] align-top" data-card-row="{{ $card->id }}" data-row-number="{{ $tableCards->firstItem() + $loop->index }}" @if ($loop->first && $tableCards->currentPage() === 1) data-active="true" aria-current="true" @endif>
+                        <th scope="row" class="card-table-num">{{ $tableCards->firstItem() + $loop->index }}</th>
+                        <td class="card-table-photo">
                             @if ($card->imageUrl())
-                                <img src="{{ $card->imageUrl() }}" alt="" class="h-14 w-24 rounded-lg object-cover ring-1 ring-black/5">
+                                <img src="{{ $card->imageUrl() }}" alt="" class="card-table-thumb">
                             @endif
                         </td>
-                        <td colspan="7" class="py-3">
-                            <form method="POST" action="{{ route('staff.cards.update', $card) }}" class="grid grid-cols-6 gap-2">
+                        <td class="min-w-0 py-3">
+                            <form method="POST" action="{{ route('staff.cards.update', $card) }}" class="min-w-0">
                                 @csrf
                                 @method('PATCH')
-                                <input type="text" name="full_name" value="{{ old('full_name', $card->full_name) }}" placeholder="Name" class="min-h-10 rounded-lg border border-black/10 bg-canvas px-2.5 text-sm">
-                                <input type="text" name="job_title" value="{{ old('job_title', $card->job_title) }}" placeholder="Title" class="min-h-10 rounded-lg border border-black/10 bg-canvas px-2.5 text-sm">
-                                <input type="text" name="company_name" value="{{ old('company_name', $card->company_name) }}" placeholder="Company" class="min-h-10 rounded-lg border border-black/10 bg-canvas px-2.5 text-sm">
-                                <input type="text" name="email" value="{{ old('email', $card->email) }}" placeholder="Email" class="min-h-10 rounded-lg border border-black/10 bg-canvas px-2.5 text-sm">
-                                <input type="text" name="phone" value="{{ old('phone', $card->phone) }}" placeholder="Phone" class="min-h-10 rounded-lg border border-black/10 bg-canvas px-2.5 text-sm">
-                                <input type="text" name="notes" value="{{ old('notes', $card->notes) }}" placeholder="Notes" class="min-h-10 rounded-lg border border-black/10 bg-canvas px-2.5 text-sm">
+                                <div class="card-table-fields">
+                                    <input type="text" name="full_name" value="{{ old('full_name', $card->full_name) }}" placeholder="Name" aria-label="Name" class="card-table-input">
+                                    <input type="text" name="job_title" value="{{ old('job_title', $card->job_title) }}" placeholder="Title" aria-label="Title" class="card-table-input">
+                                    <input type="text" name="company_name" value="{{ old('company_name', $card->company_name) }}" placeholder="Company" aria-label="Company" class="card-table-input">
+                                    <input type="text" name="email" value="{{ old('email', $card->email) }}" placeholder="Email" aria-label="Email" class="card-table-input">
+                                    <input type="text" name="phone" value="{{ old('phone', $card->phone) }}" placeholder="Phone" aria-label="Phone" class="card-table-input">
+                                    <input type="text" name="notes" value="{{ old('notes', $card->notes) }}" placeholder="Notes" aria-label="Notes" class="card-table-input">
+                                </div>
                                 <input type="hidden" name="website" value="{{ old('website', $card->website) }}">
                                 <input type="hidden" name="address" value="{{ old('address', $card->address) }}">
-                                <div class="col-span-6 flex flex-wrap items-center justify-between gap-2">
-                                    <p class="max-w-xl truncate text-xs text-mute">{{ $card->website ?: $card->address ?: $card->created_at?->diffForHumans() }}</p>
-                                    <button class="min-h-9 rounded-full bg-navy px-3 text-xs font-semibold text-white hover:bg-navy-2">Save</button>
+                                <div class="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
+                                    <p class="min-w-0 flex-1 truncate text-xs text-mute">{{ $card->website ?: $card->address ?: $card->created_at?->diffForHumans() }}</p>
+                                    <div class="flex shrink-0 items-center gap-1">
+                                        <button class="min-h-9 rounded-full bg-navy px-3 text-xs font-semibold text-white hover:bg-navy-2">Save</button>
+                                    </div>
                                 </div>
                             </form>
-                            <form method="POST" action="{{ route('staff.cards.destroy', $card) }}" class="mt-2" onsubmit="return confirm('Remove this business card?')">
+                            <form method="POST" action="{{ route('staff.cards.destroy', $card) }}" class="mt-1" onsubmit="return confirm('Remove this business card?')">
                                 @csrf
                                 @method('DELETE')
                                 <button class="min-h-9 rounded-full px-3 text-xs font-semibold text-mute hover:bg-black/[0.05] hover:text-ink">Delete</button>
@@ -116,13 +134,13 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="py-10 text-center text-sm text-mute">No cards recorded yet.</td>
+                        <td colspan="3" class="py-10 text-center text-sm text-mute">No cards recorded yet.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
-    <div class="mt-4">{{ $tableCards->links() }}</div>
+    <div id="card-table-pages" class="mt-4">{{ $tableCards->links() }}</div>
 </section>
 @endsection
 

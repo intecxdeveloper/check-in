@@ -70,7 +70,9 @@ function createCoverFlow(root) {
     const grid = document.getElementById('card-grid');
     const switches = document.querySelectorAll('[data-view]');
     let cards = parseCards(root.dataset.cards);
-    let index = 0;
+    const storedId = Number(window.sessionStorage?.getItem('card-gallery-center') || 0);
+    const storedIndex = cards.findIndex((card) => card.id === storedId);
+    let index = storedIndex >= 0 ? storedIndex : 0;
     let startX = 0;
     let view = window.localStorage?.getItem('card-gallery-view') === 'grid' ? 'grid' : 'flow';
 
@@ -107,6 +109,7 @@ function createCoverFlow(root) {
             const meta = document.createElement('p');
             meta.className = 'card-grid-meta';
             meta.textContent = card.company_name || card.email || '\u00a0';
+            button.dataset.active = i === index ? 'true' : 'false';
             button.append(img, name, meta);
             button.addEventListener('click', () => {
                 index = i;
@@ -158,6 +161,9 @@ function createCoverFlow(root) {
         if (count) {
             count.textContent = `${index + 1} / ${cards.length}`;
         }
+        if (current?.id) {
+            window.sessionStorage?.setItem('card-gallery-center', String(current.id));
+        }
         if (caption && current) {
             caption.hidden = view !== 'flow';
             caption.innerHTML = '';
@@ -169,6 +175,7 @@ function createCoverFlow(root) {
             meta.textContent = cardMeta(current);
             caption.append(title, meta);
         }
+        syncTableToCenter();
     };
 
     const setView = (next) => {
@@ -232,12 +239,153 @@ function createCoverFlow(root) {
     let ocrBusy = false;
     let tableTimer = null;
 
+    const tableSection = document.getElementById('card-table');
     const tableBody = document.getElementById('card-table-body');
+    const tablePages = document.getElementById('card-table-pages');
+    const perPage = Number(tableSection?.dataset.perPage || 15);
+    let tablePage = Number(tableSection?.dataset.page || 1);
+    let tableRequest = 0;
+
+    const pageUrl = (page) => {
+        const url = new URL(window.location.href);
+        if (page <= 1) {
+            url.searchParams.delete('page');
+        } else {
+            url.searchParams.set('page', String(page));
+        }
+
+        return url;
+    };
+
+    const rememberPage = (page) => {
+        const url = pageUrl(page);
+        const next = `${url.pathname}${url.search}`;
+        const current = `${window.location.pathname}${window.location.search}`;
+        if (next !== current) {
+            window.history.replaceState(window.history.state, '', url);
+        }
+    };
+
+    const dirtyRows = new Map();
+
+    const applyTableDocument = (doc) => {
+        const freshBody = doc.getElementById('card-table-body');
+        const freshPages = doc.getElementById('card-table-pages');
+        const freshSummary = doc.getElementById('card-table-summary');
+        const summary = document.getElementById('card-table-summary');
+        const freshSection = doc.getElementById('card-table');
+        if (! freshBody || ! tableBody) {
+            return;
+        }
+        tableBody.querySelectorAll('[data-card-row]').forEach((row) => {
+            if (row.dataset.dirty === 'true' || row.contains(document.activeElement)) {
+                dirtyRows.set(row.dataset.cardRow, row);
+            } else {
+                dirtyRows.delete(row.dataset.cardRow);
+            }
+        });
+        const keep = dirtyRows;
+        const rows = Array.from(freshBody.children).map((row) => {
+            const kept = keep.get(row.dataset?.cardRow);
+
+            return kept ?? document.importNode(row, true);
+        });
+        tableBody.replaceChildren(...rows);
+        if (freshPages && tablePages) {
+            tablePages.replaceChildren(...Array.from(freshPages.childNodes, (node) => document.importNode(node, true)));
+        }
+        if (freshSummary && summary) {
+            summary.replaceWith(document.importNode(freshSummary, true));
+        }
+        if (freshSection?.dataset.page && tableSection) {
+            tablePage = Number(freshSection.dataset.page);
+            tableSection.dataset.page = freshSection.dataset.page;
+        }
+    };
+
+    const loadTablePage = async (page) => {
+        const token = ++tableRequest;
+        try {
+            const response = await fetch(pageUrl(page), {
+                headers: { Accept: 'text/html' },
+                credentials: 'same-origin',
+            });
+            if (! response.ok || token !== tableRequest) {
+                return false;
+            }
+            const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+            if (token !== tableRequest) {
+                return false;
+            }
+            applyTableDocument(doc);
+            rememberPage(page);
+
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    const highlightRecord = () => {
+        const currentId = cards[index] ? String(cards[index].id) : '';
+        tableBody?.querySelectorAll('[data-card-row]').forEach((row) => {
+            const active = row.dataset.cardRow === currentId;
+            if (active) {
+                row.dataset.active = 'true';
+                row.setAttribute('aria-current', 'true');
+            } else {
+                row.dataset.active = 'false';
+                row.removeAttribute('aria-current');
+            }
+        });
+    };
+
+    const syncTableToCenter = () => {
+        if (! tableBody || cards.length === 0) {
+            return;
+        }
+        const page = Math.floor(index / perPage) + 1;
+        if (page !== tablePage) {
+            const requested = page;
+            loadTablePage(requested).then((ok) => {
+                if (ok && Math.floor(index / perPage) + 1 === requested) {
+                    highlightRecord();
+                }
+            });
+
+            return;
+        }
+        rememberPage(page);
+        highlightRecord();
+    };
+
+    tablePages?.addEventListener('click', (event) => {
+        const origin = event.target instanceof Element ? event.target : event.target?.parentElement;
+        const link = origin?.closest?.('a[href]');
+        if (! link) {
+            return;
+        }
+        event.preventDefault();
+        const page = Number(new URL(link.href, window.location.origin).searchParams.get('page') || '1');
+        const nextIndex = (page - 1) * perPage;
+        if (nextIndex >= 0 && nextIndex < cards.length) {
+            index = nextIndex;
+            render();
+
+            return;
+        }
+        loadTablePage(page);
+    });
+
     tableBody?.addEventListener('input', (event) => {
         event.target.closest('[data-card-row]')?.setAttribute('data-dirty', 'true');
     });
     tableBody?.addEventListener('submit', (event) => {
-        event.target.closest('[data-card-row]')?.removeAttribute('data-dirty');
+        const row = event.target.closest('[data-card-row]');
+        row?.removeAttribute('data-dirty');
+        if (row?.dataset.cardRow) {
+            dirtyRows.delete(row.dataset.cardRow);
+        }
     });
 
     /**
@@ -245,36 +393,10 @@ function createCoverFlow(root) {
      * as they are so a refresh never wipes unsaved edits.
      */
     const refreshTable = async () => {
-        if (! tableBody) {
-            return;
-        }
-        try {
-            const response = await fetch(window.location.href, {
-                headers: { Accept: 'text/html' },
-                credentials: 'same-origin',
-            });
-            if (! response.ok) {
-                return;
-            }
-            const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
-            const freshBody = doc.getElementById('card-table-body');
-            if (! freshBody) {
-                return;
-            }
-            const keep = new Map();
-            tableBody.querySelectorAll('[data-card-row]').forEach((row) => {
-                if (row.dataset.dirty === 'true' || row.contains(document.activeElement)) {
-                    keep.set(row.dataset.cardRow, row);
-                }
-            });
-            const rows = Array.from(freshBody.children).map((row) => {
-                const kept = keep.get(row.dataset?.cardRow);
-
-                return kept ?? document.importNode(row, true);
-            });
-            tableBody.replaceChildren(...rows);
-        } catch {
-            // The next card read will try again.
+        const page = cards.length === 0 ? tablePage : Math.floor(index / perPage) + 1;
+        const ok = await loadTablePage(page);
+        if (ok) {
+            highlightRecord();
         }
     };
 

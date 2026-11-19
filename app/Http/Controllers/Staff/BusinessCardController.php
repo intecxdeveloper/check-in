@@ -34,7 +34,9 @@ class BusinessCardController extends Controller
             'scanExpiresAt' => $session->expires_at,
             'phoneCannotReach' => PublicUrl::hostIsLoopback($scanUrl),
             'cards' => $cards,
-            'tableCards' => BusinessCard::query()->orderByDesc('id')->paginate(15),
+            'tableCards' => BusinessCard::query()
+                ->orderByDesc('id')
+                ->paginate(BusinessCard::TABLE_PER_PAGE),
         ]);
     }
 

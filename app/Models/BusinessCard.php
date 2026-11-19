@@ -18,6 +18,12 @@ class BusinessCard extends Model
      */
     public const GALLERY_LIMIT = 300;
 
+    /**
+     * Rows on one page of the recorded-details list. The gallery stays in the
+     * same newest-first order, so a centered card maps onto this page size.
+     */
+    public const TABLE_PER_PAGE = 15;
+
     protected $fillable = [
         'user_id',
         'scan_session_id',

@@ -193,6 +193,36 @@ class BusinessCardScanTest extends TestCase
             ->assertJsonPath('cards.0.full_name', 'Rina Maps');
     }
 
+    public function test_recorded_details_list_paginates_past_the_first_page(): void
+    {
+        $staff = User::factory()->create();
+        $session = BusinessCardScanSession::factory()->create(['user_id' => $staff->id]);
+        $cards = BusinessCard::factory()->count(16)->for($staff)->for($session, 'scanSession')->create();
+        $oldest = $cards->first();
+        $newest = $cards->last();
+
+        $this->actingAs($staff)
+            ->get(route('staff.cards'))
+            ->assertOk()
+            ->assertSee('1–15 of 16', false)
+            ->assertSee('data-per-page="15"', false)
+            ->assertSee('data-row-number="1"', false)
+            ->assertSee('data-card-row="'.$newest->id.'"', false)
+            ->assertSee('data-active="true"', false)
+            ->assertDontSee('data-card-row="'.$oldest->id.'"', false)
+            ->assertSee('page=2', false);
+
+        $this->actingAs($staff)
+            ->get(route('staff.cards', ['page' => 2]))
+            ->assertOk()
+            ->assertSee('16–16 of 16', false)
+            ->assertSee('data-page="2"', false)
+            ->assertSee('data-row-number="16"', false)
+            ->assertSee('data-card-row="'.$oldest->id.'"', false)
+            ->assertDontSee('data-card-row="'.$newest->id.'"', false)
+            ->assertDontSee('data-active="true"', false);
+    }
+
     public function test_staff_can_update_and_delete_a_card(): void
     {
         Storage::fake('public');

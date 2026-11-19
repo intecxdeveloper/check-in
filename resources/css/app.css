@@ -2714,6 +2714,72 @@ body.checkin-map-is-expanded .checkin-actions {
     box-shadow: 0 14px 28px -14px rgba(0, 37, 78, 0.55), 0 0 0 2px var(--color-navy);
 }
 
+.card-grid button[data-active='true'] .card-grid-photo {
+    box-shadow: 0 14px 28px -14px rgba(0, 37, 78, 0.55), 0 0 0 2px var(--color-orange);
+}
+
+.card-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.card-table-num {
+    width: 2.4rem;
+    padding: 0.75rem 0.4rem 0.75rem 0.65rem;
+    color: var(--color-navy);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-align: left;
+    vertical-align: top;
+}
+
+.card-table-photo {
+    width: 4.75rem;
+    padding: 0.75rem 0.5rem 0.75rem 0;
+    vertical-align: top;
+}
+
+.card-table-thumb {
+    display: block;
+    width: 4.25rem;
+    height: 2.45rem;
+    border-radius: 0.45rem;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.card-table-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+@media (max-width: 40rem) {
+    thead .card-table-fields {
+        display: none;
+    }
+}
+
+.card-table-input {
+    min-width: 0;
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0 0.6rem;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 0.5rem;
+    background: var(--color-canvas);
+    font-size: 0.8125rem;
+}
+
+#card-table tr[data-active='true'] {
+    background: color-mix(in srgb, var(--color-orange) 18%, #fff);
+    box-shadow: inset 3px 0 0 var(--color-orange);
+}
+
 .card-grid button:focus-visible {
     outline: none;
 }
