@@ -12,6 +12,12 @@ class BusinessCard extends Model
     /** @use HasFactory<BusinessCardFactory> */
     use HasFactory;
 
+    /**
+     * Cards shown in the desk gallery. The feed carries only metadata and image
+     * URLs, so a full event's worth stays light.
+     */
+    public const GALLERY_LIMIT = 300;
+
     protected $fillable = [
         'user_id',
         'scan_session_id',

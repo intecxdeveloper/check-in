@@ -26,7 +26,7 @@ class BusinessCardController extends Controller
 
         $cards = BusinessCard::query()
             ->orderByDesc('id')
-            ->limit(48)
+            ->limit(BusinessCard::GALLERY_LIMIT)
             ->get();
 
         return view('staff.cards', [
@@ -51,7 +51,7 @@ class BusinessCardController extends Controller
     {
         $cards = BusinessCard::query()
             ->orderByDesc('id')
-            ->limit(48)
+            ->limit(BusinessCard::GALLERY_LIMIT)
             ->get();
 
         return response()->json([

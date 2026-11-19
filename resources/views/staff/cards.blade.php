@@ -29,8 +29,14 @@
     </aside>
 
     <section class="min-w-0 rounded-2xl border border-black/[0.06] bg-white p-4 sm:p-5" aria-labelledby="gallery-heading">
-        <div class="flex items-center justify-between gap-3">
-            <h2 id="gallery-heading" class="text-base font-bold text-navy">Gallery</h2>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <h2 id="gallery-heading" class="text-base font-bold text-navy">Gallery</h2>
+                <div class="card-view-switch" role="group" aria-label="Gallery view">
+                    <button type="button" data-view="flow" aria-pressed="true">Slider</button>
+                    <button type="button" data-view="grid" aria-pressed="false">All cards</button>
+                </div>
+            </div>
             <p id="card-gallery-status" class="text-xs font-semibold text-mute" aria-live="polite">Waiting for the phone</p>
         </div>
         <div
@@ -54,6 +60,7 @@
             </div>
         </div>
         <div id="card-gallery-caption" class="card-coverflow-caption" hidden></div>
+        <ul id="card-grid" class="card-grid" aria-label="All business cards" hidden></ul>
     </section>
 </div>
 

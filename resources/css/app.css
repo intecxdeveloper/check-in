@@ -2648,6 +2648,103 @@ body.checkin-map-is-expanded .checkin-actions {
     color: var(--color-mute);
 }
 
+.card-view-switch {
+    display: inline-flex;
+    padding: 0.2rem;
+    border-radius: 999px;
+    background: rgba(0, 37, 78, 0.06);
+}
+
+.card-view-switch button {
+    min-height: 2rem;
+    padding: 0 0.85rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-mute);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.card-view-switch button[aria-pressed='true'] {
+    background: #fff;
+    color: var(--color-navy);
+    box-shadow: 0 1px 3px rgba(0, 37, 78, 0.12);
+}
+
+.card-view-switch button:focus-visible {
+    outline: 2px solid var(--color-navy);
+    outline-offset: 2px;
+}
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.card-grid button {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+
+.card-grid-photo {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1.75 / 1;
+    border-radius: 0.75rem;
+    background: rgba(0, 37, 78, 0.05);
+    box-shadow: 0 8px 20px -12px rgba(0, 37, 78, 0.45), 0 0 0 1px rgba(0, 37, 78, 0.06);
+    object-fit: cover;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.card-grid button:hover .card-grid-photo,
+.card-grid button:focus-visible .card-grid-photo {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px -14px rgba(0, 37, 78, 0.55), 0 0 0 2px var(--color-navy);
+}
+
+.card-grid button:focus-visible {
+    outline: none;
+}
+
+.card-grid-name {
+    margin: 0.55rem 0 0;
+    overflow: hidden;
+    color: var(--color-ink);
+    font-size: 0.86rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.card-grid-meta {
+    margin: 0.1rem 0 0;
+    overflow: hidden;
+    color: var(--color-mute);
+    font-size: 0.76rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.card-grid-empty {
+    grid-column: 1 / -1;
+    padding: 2.5rem 0;
+    color: var(--color-mute);
+    font-size: 0.88rem;
+    text-align: center;
+}
+
 .card-coverflow-caption {
     margin-top: 0.85rem;
     text-align: center;

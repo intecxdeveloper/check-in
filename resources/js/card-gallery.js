@@ -1,4 +1,5 @@
-import { ocrWorker, parseOcr, readCard, rotatedCanvas } from './card-ocr';
+import { cropCard } from './card-crop';
+import { loadImage, ocrWorker, parseOcr, readCard, rotatedCanvas } from './card-ocr';
 
 function parseCards(raw) {
     try {
@@ -66,12 +67,61 @@ function createCoverFlow(root) {
     const next = root.querySelector('[data-next]');
     const caption = document.getElementById('card-gallery-caption');
     const status = document.getElementById('card-gallery-status');
+    const grid = document.getElementById('card-grid');
+    const switches = document.querySelectorAll('[data-view]');
     let cards = parseCards(root.dataset.cards);
     let index = 0;
     let startX = 0;
+    let view = window.localStorage?.getItem('card-gallery-view') === 'grid' ? 'grid' : 'flow';
+
+    const cardMeta = (card) => [card.job_title, card.company_name, card.email, card.phone]
+        .filter(Boolean)
+        .join(' · ');
+
+    const renderGrid = () => {
+        if (! grid) {
+            return;
+        }
+        if (cards.length === 0) {
+            const emptyItem = document.createElement('li');
+            emptyItem.className = 'card-grid-empty';
+            emptyItem.textContent = 'No cards yet. Scan the QR and snap a card.';
+            grid.replaceChildren(emptyItem);
+
+            return;
+        }
+        grid.replaceChildren(...cards.map((card, i) => {
+            const item = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.setAttribute('aria-label', `Open ${card.full_name || 'unnamed card'} in the slider`);
+            const img = document.createElement('img');
+            img.className = 'card-grid-photo';
+            img.src = card.image_url || '';
+            img.alt = '';
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            const name = document.createElement('p');
+            name.className = 'card-grid-name';
+            name.textContent = card.full_name || (card.ocr_url ? 'Reading…' : 'Unnamed card');
+            const meta = document.createElement('p');
+            meta.className = 'card-grid-meta';
+            meta.textContent = card.company_name || card.email || '\u00a0';
+            button.append(img, name, meta);
+            button.addEventListener('click', () => {
+                index = i;
+                setView('flow');
+                root.focus();
+            });
+            item.append(button);
+
+            return item;
+        }));
+    };
 
     const render = () => {
         stage.querySelectorAll('.card-coverflow-item').forEach((node) => node.remove());
+        renderGrid();
 
         if (cards.length === 0) {
             empty.hidden = false;
@@ -86,6 +136,9 @@ function createCoverFlow(root) {
 
         empty.hidden = true;
         cards.forEach((card, i) => {
+            if (Math.abs(i - index) > 6) {
+                return;
+            }
             const article = document.createElement('article');
             article.className = 'card-coverflow-item';
             article.style.setProperty('--offset', String(i - index));
@@ -106,19 +159,34 @@ function createCoverFlow(root) {
             count.textContent = `${index + 1} / ${cards.length}`;
         }
         if (caption && current) {
-            caption.hidden = false;
+            caption.hidden = view !== 'flow';
             caption.innerHTML = '';
             const title = document.createElement('p');
             title.className = 'card-coverflow-name';
             title.textContent = current.full_name || 'Unnamed card';
             const meta = document.createElement('p');
             meta.className = 'card-coverflow-meta';
-            meta.textContent = [current.job_title, current.company_name, current.email, current.phone]
-                .filter(Boolean)
-                .join(' · ');
+            meta.textContent = cardMeta(current);
             caption.append(title, meta);
         }
     };
+
+    const setView = (next) => {
+        view = next;
+        window.localStorage?.setItem('card-gallery-view', view);
+        root.hidden = view !== 'flow';
+        if (grid) {
+            grid.hidden = view !== 'grid';
+        }
+        switches.forEach((button) => {
+            button.setAttribute('aria-pressed', button.dataset.view === view ? 'true' : 'false');
+        });
+        render();
+    };
+
+    switches.forEach((button) => {
+        button.addEventListener('click', () => setView(button.dataset.view === 'grid' ? 'grid' : 'flow'));
+    });
 
     const go = (delta) => {
         if (cards.length === 0) {
@@ -221,12 +289,14 @@ function createCoverFlow(root) {
     };
 
     const saveOcr = async (card) => {
-        const result = await readCard(card.image_url);
+        const photo = await loadImage(card.image_url);
+        const cardOnly = cropCard(photo);
+        const result = await readCard(cardOnly ?? photo);
         if (! result) {
             throw new Error('reader');
         }
         const body = { ocr_text: result.text, ...parseOcr(result.text, result.lines) };
-        if (result.rotation !== 0) {
+        if (cardOnly || result.rotation !== 0) {
             const upright = rotatedCanvas(result.image, result.rotation, 1600);
             if (upright) {
                 body.image_base64 = upright.toDataURL('image/jpeg', 0.88);
@@ -293,7 +363,16 @@ function createCoverFlow(root) {
         }
     };
 
+    const signature = (list) => list
+        .map((card) => [card.id, card.image_url, card.full_name, card.company_name, card.email, card.ocr_url].join('|'))
+        .join('\n');
+
     const applyFeed = (incoming) => {
+        if (signature(incoming) === signature(cards)) {
+            queueOcr(incoming);
+
+            return;
+        }
         const previousLatest = cards[0]?.id ?? 0;
         cards = incoming;
         if (cards.length > 0 && (index >= cards.length || incoming[0]?.id !== previousLatest)) {
@@ -328,7 +407,7 @@ function createCoverFlow(root) {
         }
     };
 
-    render();
+    setView(view);
     ocrWorker();
     queueOcr(cards);
     const timer = setInterval(poll, 2500);

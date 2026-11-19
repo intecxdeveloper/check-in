@@ -152,7 +152,7 @@ export function parseOcr(text, lines = []) {
     return fields;
 }
 
-function loadImage(src) {
+export function loadImage(src) {
     return new Promise((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
@@ -281,7 +281,8 @@ export function ocrWorker() {
  * Reads the card upright first and only turns it when the text looks like noise,
  * so a card photographed upside down or sideways still reads.
  *
- * @returns {Promise<{rotation: number, text: string, lines: {text: string, height: number}[], image: HTMLImageElement}|null>}
+ * @param {string|HTMLImageElement|HTMLCanvasElement} source
+ * @returns {Promise<{rotation: number, text: string, lines: {text: string, height: number}[], image: HTMLImageElement|HTMLCanvasElement}|null>}
  */
 export async function readCard(source) {
     const worker = await ocrWorker();
@@ -289,7 +290,7 @@ export async function readCard(source) {
         return null;
     }
 
-    const image = await loadImage(source);
+    const image = typeof source === 'string' ? await loadImage(source) : source;
     let best = null;
 
     for (const rotation of OCR_ROTATIONS) {
