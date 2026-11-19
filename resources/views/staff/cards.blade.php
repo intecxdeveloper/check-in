@@ -6,7 +6,7 @@
 <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
     <div>
         <h1 class="font-display text-2xl font-bold tracking-tight text-navy">Business cards</h1>
-        <p class="mt-1 max-w-xl text-sm text-mute">Scan the QR with a phone, photograph a visitor’s card, and it lands in this gallery. Keep this page open: it reads the text from each photo and fills the table for you to tidy.</p>
+        <p class="mt-1 max-w-xl text-sm text-mute">Scan the QR with a phone, photograph a visitor’s card, and it lands in this gallery. Keep this page open: it reads the text from each photo and fills the table below by itself.</p>
     </div>
     <form method="POST" action="{{ route('staff.cards.link') }}">
         @csrf
@@ -75,16 +75,16 @@
                     <th class="py-2"></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="card-table-body">
                 @forelse ($tableCards as $card)
-                    <tr class="border-b border-black/[0.04] align-top">
+                    <tr class="border-b border-black/[0.04] align-top" data-card-row="{{ $card->id }}">
                         <td class="py-3 pr-3">
                             @if ($card->imageUrl())
                                 <img src="{{ $card->imageUrl() }}" alt="" class="h-14 w-24 rounded-lg object-cover ring-1 ring-black/5">
                             @endif
                         </td>
                         <td colspan="7" class="py-3">
-                            <form method="POST" action="{{ route('staff.cards.update', $card) }}" class="grid grid-cols-6 gap-2" data-card-row="{{ $card->id }}">
+                            <form method="POST" action="{{ route('staff.cards.update', $card) }}" class="grid grid-cols-6 gap-2">
                                 @csrf
                                 @method('PATCH')
                                 <input type="text" name="full_name" value="{{ old('full_name', $card->full_name) }}" placeholder="Name" class="min-h-10 rounded-lg border border-black/10 bg-canvas px-2.5 text-sm">

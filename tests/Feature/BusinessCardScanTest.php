@@ -67,9 +67,9 @@ class BusinessCardScanTest extends TestCase
 
         $this->get('/scan/'.$token)
             ->assertOk()
-            ->assertSee('Hold still — it captures itself', false)
-            ->assertSee('Album', false)
-            ->assertDontSee('Take photo', false);
+            ->assertSee('id="card-shutter"', false)
+            ->assertSee('aria-label="Snap card"', false)
+            ->assertSee('Album', false);
     }
 
     public function test_phone_upload_stores_the_photo_as_base64_before_ocr(): void

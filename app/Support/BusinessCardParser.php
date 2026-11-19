@@ -73,7 +73,35 @@ class BusinessCardParser
             }
         }
 
+        if ($result['full_name'] === null && $result['email'] !== null) {
+            $result['full_name'] = self::nameFromEmail($result['email']);
+        }
+
         return $result;
+    }
+
+    /**
+     * Turns "aina.rahman@company.my" into "Aina Rahman"; skips shared inboxes.
+     */
+    private static function nameFromEmail(string $email): ?string
+    {
+        $local = preg_replace('/\d+/', '', Str::before($email, '@')) ?? '';
+        $parts = array_values(array_filter(
+            preg_split('/[._\-]+/', $local) ?: [],
+            fn (string $part): bool => mb_strlen($part) >= 2,
+        ));
+
+        if (count($parts) < 2 || count($parts) > 4) {
+            return null;
+        }
+
+        foreach ($parts as $part) {
+            if (preg_match('/^(info|sales|admin|contact|enquir\w*|hello|marketing|support|hr|office|mail|general|service|cs|team)$/i', $part) === 1) {
+                return null;
+            }
+        }
+
+        return Str::title(implode(' ', $parts));
     }
 
     /**
@@ -108,7 +136,7 @@ class BusinessCardParser
             return false;
         }
 
-        if (preg_match('/\b(tel|fax|phone|mobile|email|www|http)\b/i', $clean) === 1) {
+        if (preg_match('/\b(tel|fax|phone|mobile|email|www|http|sdn|bhd|berhad|ltd|limited|inc|corp|enterprise|group|solutions?|services?|technolog\w*|consult\w*|holdings?|systems?|digital|global|jalan|jln|road|street|taman|selangor|kuala|lumpur|malaysia)\b/i', $clean) === 1) {
             return false;
         }
 

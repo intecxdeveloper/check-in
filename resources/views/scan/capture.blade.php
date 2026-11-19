@@ -19,7 +19,7 @@
     >
         <header class="card-scan-top">
             <img src="{{ asset(config('expo.brand_mark')) }}" alt="{{ config('expo.brand_name') }}" class="h-7 w-auto" width="128" height="44">
-            <p id="card-scan-count" aria-live="polite">Hold still — it captures itself</p>
+            <p>Fit the card in the frame, then tap the shutter</p>
         </header>
 
         <div class="card-scan-view">
@@ -36,6 +36,8 @@
                 <input id="card-file" type="file" accept="image/*">
                 Album
             </label>
+            <button id="card-shutter" type="button" class="card-scan-shutter" aria-label="Snap card" disabled><span></span></button>
+            <p id="card-scan-count" class="card-scan-count" aria-live="polite"></p>
         </div>
     </div>
 </body>

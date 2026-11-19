@@ -5,7 +5,107 @@ const WEBSITE = /(?:https?:\/\/|www\.)[^\s<>]+/i;
 const OCR_MAX_EDGE = 2000;
 const OCR_ROTATIONS = [0, 180, 90, 270];
 
-export function parseOcr(text) {
+const NOT_A_NAME = /\b(sdn|bhd|berhad|ltd|limited|inc|corp|corporation|company|enterprise|group|solutions?|services?|technolog\w*|consult\w*|holdings?|resources|systems?|digital|global|international|academy|university|institute|agency|jalan|jln|road|street|taman|lorong|persiaran|selangor|kuala|lumpur|malaysia|johor|penang|sabah|sarawak|tel|fax|mobile|phone|email|www|http|director|manager|engineer|officer|executive|consultant|founder|president|head|lead|ceo|cto|cfo|coo|senior|assistant|specialist|analyst|department|division|marketing|sales|business|development)\b/i;
+const HONORIFIC = /^(?:dr|ir|ts|prof|dato'?|datuk|datin|tan sri|puan|pn|encik|en|mr|mrs|ms|haji|hj|hajah)\.?\s+/i;
+const MALAY_LINK = /\b(bin|binti|bt|a\/l|a\/p)\b/i;
+const GENERIC_EMAIL = /^(info|sales|admin|contact|enquir\w*|hello|marketing|support|hr|office|mail|general|service|cs|team)$/i;
+
+function titleCase(text) {
+    return text.toLowerCase().replace(/(^|[\s'\-])([a-z])/g, (match, lead, letter) => `${lead}${letter.toUpperCase()}`);
+}
+
+function cleanNameLine(line) {
+    return line
+        .replace(/[|_~*=<>{}[\]"“”]/g, ' ')
+        .replace(/^[^A-Za-z]+|[^A-Za-z.]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function nameFromEmail(email) {
+    const local = (email.split('@')[0] || '').replace(/\d+/g, '');
+    const parts = local.split(/[._\-]+/).filter((part) => part.length >= 2);
+    if (parts.length < 2 || parts.length > 4 || parts.some((part) => GENERIC_EMAIL.test(part))) {
+        return '';
+    }
+
+    return titleCase(parts.join(' '));
+}
+
+/**
+ * Picks the most name-like line. Names are usually the largest print on a card,
+ * so taller OCR lines score higher, as do lines that match the email address.
+ *
+ * @param {{text: string, height: number}[]} lines
+ */
+function guessName(lines, fields) {
+    const emailLocal = (fields.email.split('@')[0] || '').toLowerCase().replace(/[^a-z]/g, '');
+    const tallest = Math.max(1, ...lines.map((line) => line.height || 0));
+    let best = null;
+
+    lines.forEach((line, position) => {
+        const clean = cleanNameLine(line.text);
+        if (! clean || clean.length > 48 || /\d|@|\.com|\.my|www|https?/i.test(clean) || NOT_A_NAME.test(clean)) {
+            return;
+        }
+        if ([fields.company_name, fields.job_title].includes(line.text.trim())) {
+            return;
+        }
+
+        let bare = clean;
+        while (HONORIFIC.test(bare)) {
+            bare = bare.replace(HONORIFIC, '');
+        }
+        const words = bare.split(/\s+/).filter(Boolean);
+        if (words.length < 2 || words.length > 6) {
+            return;
+        }
+        if (words.some((word) => ! /^[A-Za-z][A-Za-z.'\-/@]*$/.test(word))) {
+            return;
+        }
+        if (words.some((word) => ! MALAY_LINK.test(word) && word.replace(/[^A-Za-z]/g, '').length >= 2 && ! /[aeiouy]/i.test(word))) {
+            return;
+        }
+        const letters = bare.replace(/[^A-Za-z]/g, '').length;
+        if (letters / bare.length < 0.75 || words.every((word) => word.length <= 2)) {
+            return;
+        }
+
+        const matchesEmail = emailLocal !== '' && words.some((word) => word.length >= 3 && emailLocal.includes(word.toLowerCase().replace(/[^a-z]/g, '')));
+        const capitalised = words.every((word) => MALAY_LINK.test(word) || /^[A-Z]/.test(word));
+        if (! capitalised && ! matchesEmail) {
+            return;
+        }
+
+        let score = ((line.height || 0) / tallest) * 4;
+        score += (1 - (position / Math.max(1, lines.length))) * 1.5;
+        if (matchesEmail) {
+            score += 5;
+        }
+        if (capitalised) {
+            score += 1.5;
+        }
+        if (MALAY_LINK.test(clean) || HONORIFIC.test(clean)) {
+            score += 2;
+        }
+
+        if (! best || score > best.score) {
+            best = { score, name: clean };
+        }
+    });
+
+    if (best) {
+        return /^[A-Z\s.'\-/@]+$/.test(best.name) ? titleCase(best.name) : best.name;
+    }
+
+    return fields.email ? nameFromEmail(fields.email) : '';
+}
+
+/**
+ * @param {string} text
+ * @param {{text: string, height: number}[]} [lines]
+ */
+export function parseOcr(text, lines = []) {
     const fields = {
         full_name: '',
         job_title: '',
@@ -30,26 +130,24 @@ export function parseOcr(text) {
         fields.website = /^https?:/i.test(url) ? url : `https://${url}`;
     }
 
-    const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
-    for (const line of lines) {
-        if (! fields.company_name && /\b(sdn\.?\s*bhd\.?|berhad|ltd\.?|limited|inc\.?)\b/i.test(line)) {
+    const measured = lines.length > 0
+        ? lines.filter((line) => line.text.trim() !== '')
+        : text.split(/\n+/).map((line) => ({ text: line, height: 0 })).filter((line) => line.text.trim() !== '');
+
+    for (const { text: raw } of measured) {
+        const line = raw.trim();
+        if (! fields.company_name && /\b(sdn\.?\s*bhd\.?|berhad|bhd\.?|ltd\.?|limited|inc\.?|pte\.?\s*ltd|plt)\b/i.test(line)) {
             fields.company_name = line;
         }
-        if (! fields.job_title && /\b(ceo|cto|director|manager|engineer|officer|consultant|founder|president|head|lead)\b/i.test(line)) {
+        if (! fields.job_title && /\b(ceo|cto|cfo|coo|director|manager|engineer|officer|consultant|founder|president|head|lead|executive|specialist|analyst|architect|designer|coordinator|chairman|partner)\b/i.test(line)) {
             fields.job_title = line;
         }
-        if (! fields.address && /\d+.+\b(jalan|jln|road|street|selangor|kuala|malaysia)\b/i.test(line)) {
+        if (! fields.address && /\d+.+\b(jalan|jln|road|street|taman|lorong|persiaran|selangor|kuala|malaysia)\b/i.test(line)) {
             fields.address = line;
         }
     }
 
-    for (const line of lines) {
-        const words = line.split(/\s+/);
-        if (words.length >= 2 && words.length <= 5 && ! /\d|@/.test(line) && line !== fields.company_name && line !== fields.job_title) {
-            fields.full_name = line;
-            break;
-        }
-    }
+    fields.full_name = guessName(measured, fields);
 
     return fields;
 }
@@ -183,7 +281,7 @@ export function ocrWorker() {
  * Reads the card upright first and only turns it when the text looks like noise,
  * so a card photographed upside down or sideways still reads.
  *
- * @returns {Promise<{rotation: number, text: string, image: HTMLImageElement}|null>}
+ * @returns {Promise<{rotation: number, text: string, lines: {text: string, height: number}[], image: HTMLImageElement}|null>}
  */
 export async function readCard(source) {
     const worker = await ocrWorker();
@@ -207,7 +305,11 @@ export async function readCard(source) {
         const score = confidence + (words * 3);
 
         if (! best || score > best.score) {
-            best = { rotation, text, score };
+            const lines = (data?.lines || []).map((line) => ({
+                text: (line.text || '').trim(),
+                height: Math.max(0, (line.bbox?.y1 ?? 0) - (line.bbox?.y0 ?? 0)),
+            }));
+            best = { rotation, text, score, lines };
         }
 
         if (confidence >= 60 && words >= 3) {
@@ -215,5 +317,5 @@ export async function readCard(source) {
         }
     }
 
-    return best ? { rotation: best.rotation, text: best.text, image } : null;
+    return best ? { rotation: best.rotation, text: best.text, lines: best.lines, image } : null;
 }

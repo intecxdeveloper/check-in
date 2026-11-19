@@ -60,7 +60,7 @@ class BusinessCard extends Model
             return null;
         }
 
-        return route('staff.cards.image', $this);
+        return route('staff.cards.image', [$this, 'v' => $this->updated_at?->timestamp]);
     }
 
     public function imageBinary(): ?string

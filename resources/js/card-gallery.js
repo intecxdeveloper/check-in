@@ -1,7 +1,5 @@
 import { ocrWorker, parseOcr, readCard, rotatedCanvas } from './card-ocr';
 
-const TABLE_FIELDS = ['full_name', 'job_title', 'company_name', 'email', 'phone', 'website', 'address'];
-
 function parseCards(raw) {
     try {
         const parsed = JSON.parse(raw || '[]');
@@ -164,21 +162,57 @@ function createCoverFlow(root) {
     const ocrQueue = [];
     const ocrSeen = new Set();
     let ocrBusy = false;
-    let unseenRows = 0;
+    let tableTimer = null;
 
-    const fillTableRow = (card) => {
-        const form = document.querySelector(`[data-card-row="${card.id}"]`);
-        if (! form) {
-            unseenRows += 1;
+    const tableBody = document.getElementById('card-table-body');
+    tableBody?.addEventListener('input', (event) => {
+        event.target.closest('[data-card-row]')?.setAttribute('data-dirty', 'true');
+    });
+    tableBody?.addEventListener('submit', (event) => {
+        event.target.closest('[data-card-row]')?.removeAttribute('data-dirty');
+    });
 
+    /**
+     * Re-renders the server table in place. Rows someone is typing in are kept
+     * as they are so a refresh never wipes unsaved edits.
+     */
+    const refreshTable = async () => {
+        if (! tableBody) {
             return;
         }
-        TABLE_FIELDS.forEach((name) => {
-            const input = form.elements.namedItem(name);
-            if (input && ! input.value && card[name]) {
-                input.value = card[name];
+        try {
+            const response = await fetch(window.location.href, {
+                headers: { Accept: 'text/html' },
+                credentials: 'same-origin',
+            });
+            if (! response.ok) {
+                return;
             }
-        });
+            const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const freshBody = doc.getElementById('card-table-body');
+            if (! freshBody) {
+                return;
+            }
+            const keep = new Map();
+            tableBody.querySelectorAll('[data-card-row]').forEach((row) => {
+                if (row.dataset.dirty === 'true' || row.contains(document.activeElement)) {
+                    keep.set(row.dataset.cardRow, row);
+                }
+            });
+            const rows = Array.from(freshBody.children).map((row) => {
+                const kept = keep.get(row.dataset?.cardRow);
+
+                return kept ?? document.importNode(row, true);
+            });
+            tableBody.replaceChildren(...rows);
+        } catch {
+            // The next card read will try again.
+        }
+    };
+
+    const scheduleTableRefresh = () => {
+        window.clearTimeout(tableTimer);
+        tableTimer = window.setTimeout(refreshTable, 400);
     };
 
     const replaceCard = (updated) => {
@@ -191,7 +225,7 @@ function createCoverFlow(root) {
         if (! result) {
             throw new Error('reader');
         }
-        const body = { ocr_text: result.text, ...parseOcr(result.text) };
+        const body = { ocr_text: result.text, ...parseOcr(result.text, result.lines) };
         if (result.rotation !== 0) {
             const upright = rotatedCanvas(result.image, result.rotation, 1600);
             if (upright) {
@@ -215,11 +249,8 @@ function createCoverFlow(root) {
         }
         const payload = await response.json();
         if (payload.card) {
-            if (result.rotation !== 0 && payload.card.image_url) {
-                payload.card.image_url = `${payload.card.image_url}?v=${Date.now()}`;
-            }
             replaceCard(payload.card);
-            fillTableRow(payload.card);
+            scheduleTableRefresh();
         }
 
         return payload.card;
@@ -239,9 +270,6 @@ function createCoverFlow(root) {
             const updated = await saveOcr(card);
             const name = updated?.full_name || updated?.company_name;
             setStatus(name ? `Read: ${name}` : 'No clear text on that card. Type it in the table.');
-            if (ocrQueue.length === 0 && unseenRows > 0) {
-                setStatus(`${name ? `Read: ${name}. ` : ''}Reload to edit ${unseenRows === 1 ? 'the new card' : `${unseenRows} new cards`} in the table.`);
-            }
         } catch (error) {
             ocrSeen.delete(card.id);
             setStatus(error.message === 'reader'
@@ -267,17 +295,13 @@ function createCoverFlow(root) {
 
     const applyFeed = (incoming) => {
         const previousLatest = cards[0]?.id ?? 0;
-        const cacheBusted = new Map(cards.map((card) => [card.id, card.image_url]));
-        cards = incoming.map((card) => {
-            const known = cacheBusted.get(card.id);
-
-            return known && known.startsWith(card.image_url || '\u0000') ? { ...card, image_url: known } : card;
-        });
+        cards = incoming;
         if (cards.length > 0 && (index >= cards.length || incoming[0]?.id !== previousLatest)) {
             index = 0;
         }
         if (incoming[0]?.id > previousLatest) {
             setStatus('New card received');
+            scheduleTableRefresh();
         }
         render();
         queueOcr(incoming);

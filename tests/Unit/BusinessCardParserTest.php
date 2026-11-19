@@ -46,4 +46,17 @@ TEXT;
         $this->assertSame('Lead Engineer', $filled['job_title']);
         $this->assertSame('hello@maps.test', $filled['email']);
     }
+
+    public function test_company_lines_are_not_taken_as_the_name(): void
+    {
+        $parsed = BusinessCardParser::parse("Geospatial Solutions\nAina Rahman\naina@nadi.my");
+
+        $this->assertSame('Aina Rahman', $parsed['full_name']);
+    }
+
+    public function test_name_falls_back_to_a_personal_email_address(): void
+    {
+        $this->assertSame('Aina Rahman', BusinessCardParser::parse('aina.rahman@nadi.my 0123456789')['full_name']);
+        $this->assertNull(BusinessCardParser::parse('sales@nadi.my 0123456789')['full_name']);
+    }
 }
