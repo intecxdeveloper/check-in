@@ -6,7 +6,7 @@
 <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
     <div>
         <h1 class="font-display text-2xl font-bold tracking-tight text-navy">Business cards</h1>
-        <p class="mt-1 max-w-xl text-sm text-mute">Scan the QR with a phone, photograph a visitor’s card, and it lands in this gallery. Text is read automatically so you can tidy it in the table.</p>
+        <p class="mt-1 max-w-xl text-sm text-mute">Scan the QR with a phone, photograph a visitor’s card, and it lands in this gallery. Keep this page open: it reads the text from each photo and fills the table for you to tidy.</p>
     </div>
     <form method="POST" action="{{ route('staff.cards.link') }}">
         @csrf
@@ -37,6 +37,7 @@
             id="card-gallery"
             class="card-coverflow"
             data-feed="{{ route('staff.cards.feed') }}"
+            data-csrf="{{ csrf_token() }}"
             data-scan-url="{{ $scanUrl }}"
             data-cards='@json($cards->map->toGalleryArray()->values())'
         >
@@ -83,7 +84,7 @@
                             @endif
                         </td>
                         <td colspan="7" class="py-3">
-                            <form method="POST" action="{{ route('staff.cards.update', $card) }}" class="grid grid-cols-6 gap-2">
+                            <form method="POST" action="{{ route('staff.cards.update', $card) }}" class="grid grid-cols-6 gap-2" data-card-row="{{ $card->id }}">
                                 @csrf
                                 @method('PATCH')
                                 <input type="text" name="full_name" value="{{ old('full_name', $card->full_name) }}" placeholder="Name" class="min-h-10 rounded-lg border border-black/10 bg-canvas px-2.5 text-sm">
@@ -120,5 +121,6 @@
 
 @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js" integrity="sha384-0RsG1yo/crf/1Qc14sho26SXXOTngNCjgJw7fuvXBt9W/OChF/Ijx+aUuBDqQwEk" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" integrity="sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F" crossorigin="anonymous" defer></script>
     @vite(['resources/js/card-gallery.js'])
 @endpush

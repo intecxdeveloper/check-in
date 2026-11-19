@@ -26,12 +26,23 @@ class BusinessCard extends Model
         'website',
         'address',
         'ocr_text',
+        'ocr_completed_at',
         'notes',
     ];
 
     protected $hidden = [
         'image_base64',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'ocr_completed_at' => 'datetime',
+        ];
+    }
 
     public function user(): BelongsTo
     {
@@ -63,6 +74,11 @@ class BusinessCard extends Model
         return $bytes === false ? null : $bytes;
     }
 
+    public function needsOcr(): bool
+    {
+        return $this->ocr_completed_at === null && filled($this->image_base64);
+    }
+
     public function displayName(): string
     {
         return filled($this->full_name) ? (string) $this->full_name : 'Unnamed card';
@@ -72,6 +88,7 @@ class BusinessCard extends Model
      * @return array{
      *     id: int,
      *     image_url: ?string,
+     *     ocr_url: ?string,
      *     full_name: ?string,
      *     job_title: ?string,
      *     company_name: ?string,
@@ -89,6 +106,7 @@ class BusinessCard extends Model
         return [
             'id' => $this->id,
             'image_url' => $this->imageUrl(),
+            'ocr_url' => $this->needsOcr() ? route('staff.cards.ocr', $this) : null,
             'full_name' => $this->full_name,
             'job_title' => $this->job_title,
             'company_name' => $this->company_name,

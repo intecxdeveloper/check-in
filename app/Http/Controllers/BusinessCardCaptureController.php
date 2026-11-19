@@ -2,12 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreBusinessCardOcrRequest;
 use App\Http\Requests\StoreCapturedBusinessCardRequest;
 use App\Models\BusinessCard;
 use App\Models\BusinessCardScanSession;
 use App\Support\BusinessCardImage;
-use App\Support\BusinessCardParser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
@@ -48,56 +46,7 @@ class BusinessCardCaptureController extends Controller
         return response()->json([
             'ok' => true,
             'card' => $card->toGalleryArray(),
-            'ocr_url' => url('/scan/'.$token.'/cards/'.$card->id),
         ], 201);
-    }
-
-    public function ocr(StoreBusinessCardOcrRequest $request, string $token, BusinessCard $businessCard): JsonResponse
-    {
-        $session = $this->usableSession($token);
-
-        if ($businessCard->scan_session_id !== $session->id) {
-            abort(404);
-        }
-
-        $data = $request->validated();
-        $ocrText = trim((string) ($data['ocr_text'] ?? ''));
-        $fields = BusinessCardParser::fillBlanks([
-            'full_name' => $data['full_name'] ?? null,
-            'job_title' => $data['job_title'] ?? null,
-            'company_name' => $data['company_name'] ?? null,
-            'email' => $data['email'] ?? null,
-            'phone' => $data['phone'] ?? null,
-            'website' => $data['website'] ?? null,
-            'address' => $data['address'] ?? null,
-        ], $ocrText);
-
-        $upright = filled($data['image_base64'] ?? null)
-            ? BusinessCardImage::fromDataUri((string) $data['image_base64'])
-            : null;
-
-        if ($upright !== null) {
-            $businessCard->fill([
-                'image_base64' => $upright['base64'],
-                'image_mime' => $upright['mime'],
-            ]);
-        }
-
-        $businessCard->update([
-            'full_name' => $fields['full_name'] ?: $businessCard->full_name,
-            'job_title' => $fields['job_title'] ?: $businessCard->job_title,
-            'company_name' => $fields['company_name'] ?: $businessCard->company_name,
-            'email' => $fields['email'] ?: $businessCard->email,
-            'phone' => $fields['phone'] ?: $businessCard->phone,
-            'website' => $fields['website'] ?: $businessCard->website,
-            'address' => $fields['address'] ?: $businessCard->address,
-            'ocr_text' => $ocrText !== '' ? $ocrText : $businessCard->ocr_text,
-        ]);
-
-        return response()->json([
-            'ok' => true,
-            'card' => $businessCard->fresh()->toGalleryArray(),
-        ]);
     }
 
     /**

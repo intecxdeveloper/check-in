@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreBusinessCardOcrRequest;
 use App\Http\Requests\UpdateBusinessCardRequest;
 use App\Models\BusinessCard;
 use App\Models\BusinessCardScanSession;
+use App\Support\BusinessCardImage;
+use App\Support\BusinessCardParser;
 use App\Support\PublicUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -71,6 +74,53 @@ class BusinessCardController extends Controller
         ]));
 
         return back()->with('status', 'Card details saved.');
+    }
+
+    /**
+     * Saves text read by the staff desk from a stored photo, without overwriting
+     * fields staff already typed.
+     */
+    public function ocr(StoreBusinessCardOcrRequest $request, BusinessCard $businessCard): JsonResponse
+    {
+        $data = $request->validated();
+        $ocrText = trim((string) ($data['ocr_text'] ?? ''));
+        $fields = BusinessCardParser::fillBlanks([
+            'full_name' => $data['full_name'] ?? null,
+            'job_title' => $data['job_title'] ?? null,
+            'company_name' => $data['company_name'] ?? null,
+            'email' => $data['email'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'website' => $data['website'] ?? null,
+            'address' => $data['address'] ?? null,
+        ], $ocrText);
+
+        $upright = filled($data['image_base64'] ?? null)
+            ? BusinessCardImage::fromDataUri((string) $data['image_base64'])
+            : null;
+
+        if ($upright !== null) {
+            $businessCard->fill([
+                'image_base64' => $upright['base64'],
+                'image_mime' => $upright['mime'],
+            ]);
+        }
+
+        $businessCard->update([
+            'full_name' => $businessCard->full_name ?: ($fields['full_name'] ?: null),
+            'job_title' => $businessCard->job_title ?: ($fields['job_title'] ?: null),
+            'company_name' => $businessCard->company_name ?: ($fields['company_name'] ?: null),
+            'email' => $businessCard->email ?: ($fields['email'] ?: null),
+            'phone' => $businessCard->phone ?: ($fields['phone'] ?: null),
+            'website' => $businessCard->website ?: ($fields['website'] ?: null),
+            'address' => $businessCard->address ?: ($fields['address'] ?: null),
+            'ocr_text' => $ocrText !== '' ? $ocrText : $businessCard->ocr_text,
+            'ocr_completed_at' => now(),
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'card' => $businessCard->fresh()->toGalleryArray(),
+        ]);
     }
 
     public function image(BusinessCard $businessCard): Response

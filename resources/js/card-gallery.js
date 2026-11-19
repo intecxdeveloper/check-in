@@ -1,3 +1,7 @@
+import { ocrWorker, parseOcr, readCard, rotatedCanvas } from './card-ocr';
+
+const TABLE_FIELDS = ['full_name', 'job_title', 'company_name', 'email', 'phone', 'website', 'address'];
+
 function parseCards(raw) {
     try {
         const parsed = JSON.parse(raw || '[]');
@@ -151,16 +155,132 @@ function createCoverFlow(root) {
         }
     });
 
+    const setStatus = (message) => {
+        if (status) {
+            status.textContent = message;
+        }
+    };
+
+    const ocrQueue = [];
+    const ocrSeen = new Set();
+    let ocrBusy = false;
+    let unseenRows = 0;
+
+    const fillTableRow = (card) => {
+        const form = document.querySelector(`[data-card-row="${card.id}"]`);
+        if (! form) {
+            unseenRows += 1;
+
+            return;
+        }
+        TABLE_FIELDS.forEach((name) => {
+            const input = form.elements.namedItem(name);
+            if (input && ! input.value && card[name]) {
+                input.value = card[name];
+            }
+        });
+    };
+
+    const replaceCard = (updated) => {
+        cards = cards.map((card) => (card.id === updated.id ? updated : card));
+        render();
+    };
+
+    const saveOcr = async (card) => {
+        const result = await readCard(card.image_url);
+        if (! result) {
+            throw new Error('reader');
+        }
+        const body = { ocr_text: result.text, ...parseOcr(result.text) };
+        if (result.rotation !== 0) {
+            const upright = rotatedCanvas(result.image, result.rotation, 1600);
+            if (upright) {
+                body.image_base64 = upright.toDataURL('image/jpeg', 0.88);
+            }
+        }
+
+        const response = await fetch(card.ocr_url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': root.dataset.csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(body),
+        });
+        if (! response.ok) {
+            throw new Error(String(response.status));
+        }
+        const payload = await response.json();
+        if (payload.card) {
+            if (result.rotation !== 0 && payload.card.image_url) {
+                payload.card.image_url = `${payload.card.image_url}?v=${Date.now()}`;
+            }
+            replaceCard(payload.card);
+            fillTableRow(payload.card);
+        }
+
+        return payload.card;
+    };
+
+    const pumpOcr = async () => {
+        if (ocrBusy) {
+            return;
+        }
+        const card = ocrQueue.shift();
+        if (! card) {
+            return;
+        }
+        ocrBusy = true;
+        setStatus(`Reading card text… ${ocrQueue.length + 1} left`);
+        try {
+            const updated = await saveOcr(card);
+            const name = updated?.full_name || updated?.company_name;
+            setStatus(name ? `Read: ${name}` : 'No clear text on that card. Type it in the table.');
+            if (ocrQueue.length === 0 && unseenRows > 0) {
+                setStatus(`${name ? `Read: ${name}. ` : ''}Reload to edit ${unseenRows === 1 ? 'the new card' : `${unseenRows} new cards`} in the table.`);
+            }
+        } catch (error) {
+            ocrSeen.delete(card.id);
+            setStatus(error.message === 'reader'
+                ? 'Text reader did not load. Photos are saved; it will retry.'
+                : 'Could not read a card. It will retry shortly.');
+        } finally {
+            ocrBusy = false;
+            pumpOcr();
+        }
+    };
+
+    const queueOcr = (list) => {
+        list.forEach((card) => {
+            if (card.ocr_url && card.image_url && ! ocrSeen.has(card.id)) {
+                ocrSeen.add(card.id);
+                ocrQueue.push(card);
+            }
+        });
+        if (ocrQueue.length > 0) {
+            pumpOcr();
+        }
+    };
+
     const applyFeed = (incoming) => {
         const previousLatest = cards[0]?.id ?? 0;
-        cards = incoming;
+        const cacheBusted = new Map(cards.map((card) => [card.id, card.image_url]));
+        cards = incoming.map((card) => {
+            const known = cacheBusted.get(card.id);
+
+            return known && known.startsWith(card.image_url || '\u0000') ? { ...card, image_url: known } : card;
+        });
         if (cards.length > 0 && (index >= cards.length || incoming[0]?.id !== previousLatest)) {
             index = 0;
         }
-        if (incoming[0]?.id > previousLatest && status) {
-            status.textContent = 'New card received';
+        if (incoming[0]?.id > previousLatest) {
+            setStatus('New card received');
         }
         render();
+        queueOcr(incoming);
     };
 
     const poll = async () => {
@@ -185,6 +305,8 @@ function createCoverFlow(root) {
     };
 
     render();
+    ocrWorker();
+    queueOcr(cards);
     const timer = setInterval(poll, 2500);
     window.addEventListener('beforeunload', () => clearInterval(timer));
 }

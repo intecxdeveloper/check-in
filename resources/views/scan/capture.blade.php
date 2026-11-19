@@ -7,7 +7,6 @@
     <meta name="robots" content="noindex, nofollow">
     <title>Scan card · {{ config('expo.brand_name') }}</title>
     @include('partials.brand-meta')
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" integrity="sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F" crossorigin="anonymous" defer></script>
     @vite(['resources/css/app.css', 'resources/js/card-capture.js'])
 </head>
 <body class="card-scan-body antialiased">
@@ -20,7 +19,7 @@
     >
         <header class="card-scan-top">
             <img src="{{ asset(config('expo.brand_mark')) }}" alt="{{ config('expo.brand_name') }}" class="h-7 w-auto" width="128" height="44">
-            <p id="card-ocr-status" aria-live="polite">Hold still — it captures itself</p>
+            <p id="card-scan-count" aria-live="polite">Hold still — it captures itself</p>
         </header>
 
         <div class="card-scan-view">

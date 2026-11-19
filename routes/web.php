@@ -24,10 +24,6 @@ Route::post('/scan/{token}', [BusinessCardCaptureController::class, 'store'])
     ->middleware('throttle:30,1')
     ->where('token', '[A-Za-z0-9]{32}')
     ->name('scan.store');
-Route::patch('/scan/{token}/cards/{businessCard}', [BusinessCardCaptureController::class, 'ocr'])
-    ->middleware('throttle:30,1')
-    ->where('token', '[A-Za-z0-9]{32}')
-    ->name('scan.ocr');
 
 Route::prefix('api')->group(function () {
     Route::get('/map/companies', [MapController::class, 'companies'])->name('api.map.companies');
@@ -69,6 +65,7 @@ Route::prefix('staff')->name('staff.')->group(function () {
         Route::post('/cards/link', [BusinessCardController::class, 'rotate'])->name('cards.link');
         Route::get('/cards/feed', [BusinessCardController::class, 'feed'])->name('cards.feed');
         Route::get('/cards/{businessCard}/image', [BusinessCardController::class, 'image'])->name('cards.image');
+        Route::patch('/cards/{businessCard}/ocr', [BusinessCardController::class, 'ocr'])->name('cards.ocr');
         Route::patch('/cards/{businessCard}', [BusinessCardController::class, 'update'])->name('cards.update');
         Route::delete('/cards/{businessCard}', [BusinessCardController::class, 'destroy'])->name('cards.destroy');
         Route::get('/visitors', [VisitorController::class, 'index'])->name('visitors');

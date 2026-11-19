@@ -83,8 +83,7 @@ class BusinessCardScanTest extends TestCase
             'image_base64' => $dataUri,
         ])->assertCreated()
             ->assertJsonPath('ok', true)
-            ->assertJsonPath('card.full_name', null)
-            ->assertJsonStructure(['ocr_url']);
+            ->assertJsonPath('card.full_name', null);
 
         $card = BusinessCard::query()->first();
         $this->assertNotNull($card);
@@ -104,43 +103,62 @@ class BusinessCardScanTest extends TestCase
             ->json();
         $this->assertArrayNotHasKey('image_base64', $feed['cards'][0]);
         $this->assertStringContainsString('/staff/cards/'.$card->id.'/image', $feed['cards'][0]['image_url']);
+        $this->assertSame(route('staff.cards.ocr', $card), $feed['cards'][0]['ocr_url']);
     }
 
-    public function test_phone_ocr_updates_the_card_after_the_photo_is_saved(): void
+    public function test_phone_cannot_submit_ocr_text(): void
     {
-        $token = Str::lower(Str::random(32));
-        $session = BusinessCardScanSession::factory()->withToken($token)->create();
-        $file = UploadedFile::fake()->image('card.jpg', 800, 450);
-        $dataUri = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($file->getRealPath()));
+        $card = BusinessCard::factory()->unread()->create();
 
-        $store = $this->postJson('/scan/'.$token, ['image_base64' => $dataUri])->assertCreated();
-        $card = BusinessCard::query()->findOrFail($store->json('card.id'));
+        $this->patchJson(route('staff.cards.ocr', $card), ['ocr_text' => 'Aina Rahman'])
+            ->assertUnauthorized();
+        $this->assertNull($card->fresh()->ocr_completed_at);
+    }
 
-        $this->patchJson('/scan/'.$token.'/cards/'.$card->id, [
-            'ocr_text' => "Aina Rahman\nGeospatial Director\nNADI Spatial Sdn Bhd\naina@nadispatial.my\n0123456789",
-        ])->assertOk()
+    public function test_desk_ocr_fills_the_card_and_marks_it_read(): void
+    {
+        $card = BusinessCard::factory()->unread()->create();
+
+        $this->actingAs(User::factory()->create())
+            ->patchJson(route('staff.cards.ocr', $card), [
+                'ocr_text' => "Aina Rahman\nGeospatial Director\nNADI Spatial Sdn Bhd\naina@nadispatial.my\n0123456789",
+            ])->assertOk()
             ->assertJsonPath('card.full_name', 'Aina Rahman')
             ->assertJsonPath('card.company_name', 'NADI Spatial Sdn Bhd')
-            ->assertJsonPath('card.email', 'aina@nadispatial.my');
+            ->assertJsonPath('card.email', 'aina@nadispatial.my')
+            ->assertJsonPath('card.ocr_url', null);
 
-        $this->assertSame($session->id, $card->fresh()->scan_session_id);
+        $this->assertNotNull($card->fresh()->ocr_completed_at);
     }
 
-    public function test_phone_ocr_replaces_the_photo_with_the_upright_version(): void
+    public function test_desk_ocr_keeps_details_staff_already_typed(): void
     {
-        $token = Str::lower(Str::random(32));
-        BusinessCardScanSession::factory()->withToken($token)->create();
+        $card = BusinessCard::factory()->unread()->create(['full_name' => 'Typed By Staff']);
+
+        $this->actingAs(User::factory()->create())
+            ->patchJson(route('staff.cards.ocr', $card), [
+                'ocr_text' => "Aina Rahman\naina@nadispatial.my",
+            ])->assertOk()
+            ->assertJsonPath('card.full_name', 'Typed By Staff')
+            ->assertJsonPath('card.email', 'aina@nadispatial.my');
+    }
+
+    public function test_desk_ocr_replaces_the_photo_with_the_upright_version(): void
+    {
         $sideways = UploadedFile::fake()->image('card.jpg', 450, 800);
         $upright = UploadedFile::fake()->image('card.jpg', 800, 450);
         $toDataUri = fn (UploadedFile $file): string => 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($file->getRealPath()));
+        $token = Str::lower(Str::random(32));
+        BusinessCardScanSession::factory()->withToken($token)->create();
 
         $store = $this->postJson('/scan/'.$token, ['image_base64' => $toDataUri($sideways)])->assertCreated();
         $card = BusinessCard::query()->findOrFail($store->json('card.id'));
 
-        $this->patchJson('/scan/'.$token.'/cards/'.$card->id, [
-            'ocr_text' => 'Aina Rahman',
-            'image_base64' => $toDataUri($upright),
-        ])->assertOk();
+        $this->actingAs(User::factory()->create())
+            ->patchJson(route('staff.cards.ocr', $card), [
+                'ocr_text' => 'Aina Rahman',
+                'image_base64' => $toDataUri($upright),
+            ])->assertOk();
 
         [$width, $height] = getimagesizefromstring((string) $card->fresh()->imageBinary());
         $this->assertGreaterThan($height, $width);
@@ -248,6 +266,5 @@ class BusinessCardScanTest extends TestCase
         $routes = app('router')->getRoutes();
         $this->assertContains('throttle:60,1', $routes->getByName('scan.show')->gatherMiddleware());
         $this->assertContains('throttle:30,1', $routes->getByName('scan.store')->gatherMiddleware());
-        $this->assertContains('throttle:30,1', $routes->getByName('scan.ocr')->gatherMiddleware());
     }
 }

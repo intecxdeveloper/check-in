@@ -34,4 +34,22 @@ class BusinessCardFactory extends Factory
             'notes' => null,
         ];
     }
+
+    /**
+     * A freshly snapped photo the desk has not read yet.
+     */
+    public function unread(): static
+    {
+        return $this->state(fn (): array => [
+            'full_name' => null,
+            'job_title' => null,
+            'company_name' => null,
+            'email' => null,
+            'phone' => null,
+            'website' => null,
+            'address' => null,
+            'ocr_text' => null,
+            'ocr_completed_at' => null,
+        ]);
+    }
 }
