@@ -67,33 +67,63 @@ class BusinessCardScanTest extends TestCase
 
         $this->get('/scan/'.$token)
             ->assertOk()
-            ->assertSee('Hold the card in the frame', false)
-            ->assertSee('Take photo', false);
+            ->assertSee('Hold still — it captures itself', false)
+            ->assertSee('Album', false)
+            ->assertDontSee('Take photo', false);
     }
 
-    public function test_phone_upload_stores_a_reencoded_card_and_ocr_fields(): void
+    public function test_phone_upload_stores_the_photo_as_base64_before_ocr(): void
     {
-        Storage::fake('public');
         $token = Str::lower(Str::random(32));
         $session = BusinessCardScanSession::factory()->withToken($token)->create();
+        $file = UploadedFile::fake()->image('card.jpg', 1800, 1000);
+        $dataUri = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($file->getRealPath()));
 
         $this->postJson('/scan/'.$token, [
-            'image' => UploadedFile::fake()->image('card.jpg', 1800, 1000),
-            'ocr_text' => "Aina Rahman\nGeospatial Director\nNADI Spatial Sdn Bhd\naina@nadispatial.my\n0123456789",
+            'image_base64' => $dataUri,
         ])->assertCreated()
             ->assertJsonPath('ok', true)
-            ->assertJsonPath('card.full_name', 'Aina Rahman')
-            ->assertJsonPath('card.company_name', 'NADI Spatial Sdn Bhd')
-            ->assertJsonPath('card.email', 'aina@nadispatial.my');
+            ->assertJsonPath('card.full_name', null)
+            ->assertJsonStructure(['ocr_url']);
 
         $card = BusinessCard::query()->first();
         $this->assertNotNull($card);
         $this->assertSame($session->user_id, $card->user_id);
         $this->assertSame($session->id, $card->scan_session_id);
-        $this->assertStringEndsWith('.webp', $card->image_path);
-        Storage::disk('public')->assertExists($card->image_path);
-        [$width] = getimagesizefromstring(Storage::disk('public')->get($card->image_path));
+        $this->assertNull($card->full_name);
+        $this->assertNotEmpty($card->image_base64);
+        $this->assertSame('image/webp', $card->image_mime);
+        $binary = $card->imageBinary();
+        $this->assertNotNull($binary);
+        [$width] = getimagesizefromstring($binary);
         $this->assertLessThanOrEqual(1600, $width);
+
+        $feed = $this->actingAs(User::factory()->create())
+            ->getJson(route('staff.cards.feed'))
+            ->assertOk()
+            ->json();
+        $this->assertArrayNotHasKey('image_base64', $feed['cards'][0]);
+        $this->assertStringContainsString('/staff/cards/'.$card->id.'/image', $feed['cards'][0]['image_url']);
+    }
+
+    public function test_phone_ocr_updates_the_card_after_the_photo_is_saved(): void
+    {
+        $token = Str::lower(Str::random(32));
+        $session = BusinessCardScanSession::factory()->withToken($token)->create();
+        $file = UploadedFile::fake()->image('card.jpg', 800, 450);
+        $dataUri = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($file->getRealPath()));
+
+        $store = $this->postJson('/scan/'.$token, ['image_base64' => $dataUri])->assertCreated();
+        $card = BusinessCard::query()->findOrFail($store->json('card.id'));
+
+        $this->patchJson('/scan/'.$token.'/cards/'.$card->id, [
+            'ocr_text' => "Aina Rahman\nGeospatial Director\nNADI Spatial Sdn Bhd\naina@nadispatial.my\n0123456789",
+        ])->assertOk()
+            ->assertJsonPath('card.full_name', 'Aina Rahman')
+            ->assertJsonPath('card.company_name', 'NADI Spatial Sdn Bhd')
+            ->assertJsonPath('card.email', 'aina@nadispatial.my');
+
+        $this->assertSame($session->id, $card->fresh()->scan_session_id);
     }
 
     public function test_phone_upload_rejects_a_non_image(): void
@@ -103,8 +133,8 @@ class BusinessCardScanTest extends TestCase
         BusinessCardScanSession::factory()->withToken($token)->create();
 
         $this->postJson('/scan/'.$token, [
-            'image' => UploadedFile::fake()->createWithContent('shell.php', '<?php echo 1;'),
-        ])->assertUnprocessable()->assertJsonValidationErrors('image');
+            'image_base64' => 'data:image/jpeg;base64,'.base64_encode('<?php echo 1;'),
+        ])->assertUnprocessable();
 
         $this->assertSame(0, BusinessCard::query()->count());
     }
@@ -161,6 +191,23 @@ class BusinessCardScanTest extends TestCase
         Storage::disk('public')->assertMissing('business-cards/keep.webp');
     }
 
+    public function test_staff_can_view_the_stored_card_image(): void
+    {
+        $token = Str::lower(Str::random(32));
+        BusinessCardScanSession::factory()->withToken($token)->create();
+        $file = UploadedFile::fake()->image('card.jpg', 640, 360);
+        $dataUri = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($file->getRealPath()));
+        $store = $this->postJson('/scan/'.$token, ['image_base64' => $dataUri])->assertCreated();
+        $card = BusinessCard::query()->findOrFail($store->json('card.id'));
+
+        $this->get(route('staff.cards.image', $card))->assertRedirect('/staff/login');
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('staff.cards.image', $card))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/webp');
+    }
+
     public function test_new_qr_revokes_the_previous_phone_link(): void
     {
         $staff = User::factory()->create();
@@ -181,5 +228,6 @@ class BusinessCardScanTest extends TestCase
         $routes = app('router')->getRoutes();
         $this->assertContains('throttle:60,1', $routes->getByName('scan.show')->gatherMiddleware());
         $this->assertContains('throttle:30,1', $routes->getByName('scan.store')->gatherMiddleware());
+        $this->assertContains('throttle:30,1', $routes->getByName('scan.ocr')->gatherMiddleware());
     }
 }

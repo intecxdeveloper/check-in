@@ -10,6 +10,7 @@ use App\Support\PublicUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -70,6 +71,21 @@ class BusinessCardController extends Controller
         ]));
 
         return back()->with('status', 'Card details saved.');
+    }
+
+    public function image(BusinessCard $businessCard): Response
+    {
+        $binary = $businessCard->imageBinary();
+
+        if ($binary === null) {
+            abort(404);
+        }
+
+        return response($binary, 200, [
+            'Content-Type' => $businessCard->image_mime ?: 'image/webp',
+            'Cache-Control' => 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function destroy(BusinessCard $businessCard): RedirectResponse

@@ -2,6 +2,15 @@ const EMAIL = /[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i;
 const PHONE = /(?:\+?\s*6\s*0|0)\s*1\d(?:[\s-]?\d){7,8}|\+\d{1,3}[\s-]?(?:\d[\s-]?){7,14}\d/;
 const WEBSITE = /(?:https?:\/\/|www\.)[^\s<>]+/i;
 
+const SAMPLE_WIDTH = 160;
+const SAMPLE_HEIGHT = 90;
+const STABLE_FRAMES = 6;
+const MOTION_LIMIT = 14;
+const FRAME_X = 0.07;
+const FRAME_Y = 0.18;
+const FRAME_W = 0.86;
+const FRAME_H = 0.64;
+
 function parseOcr(text) {
     const fields = {
         full_name: '',
@@ -59,18 +68,158 @@ function csrfHeaders(token) {
     };
 }
 
-async function readText(blob) {
-    if (typeof window.Tesseract?.recognize !== 'function') {
+function dataUrlFromBlob(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('read'));
+        reader.readAsDataURL(blob);
+    });
+}
+
+function enhanceForOcr(source) {
+    return createImageBitmap(source).then((bitmap) => {
+        const scale = Math.min(2, 1400 / Math.max(bitmap.width, 1));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const context = canvas.getContext('2d');
+        if (! context) {
+            bitmap.close();
+
+            return source;
+        }
+        context.filter = 'grayscale(1) contrast(1.45) brightness(1.08)';
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+
+        return canvas;
+    }).catch(() => source);
+}
+
+let ocrWorkerPromise = null;
+
+function ocrWorker() {
+    const Tesseract = window.Tesseract;
+    if (! Tesseract?.createWorker) {
+        return null;
+    }
+
+    if (! ocrWorkerPromise) {
+        ocrWorkerPromise = Tesseract.createWorker('eng', 1).then(async (worker) => {
+            await worker.setParameters({ tessedit_pageseg_mode: '6' });
+
+            return worker;
+        });
+    }
+
+    return ocrWorkerPromise;
+}
+
+async function readText(source) {
+    const Tesseract = window.Tesseract;
+    if (! Tesseract) {
         return '';
     }
 
-    try {
-        const result = await window.Tesseract.recognize(blob, 'eng', { logger: () => {} });
+    const enhanced = await enhanceForOcr(source);
 
-        return (result?.data?.text || '').trim();
+    try {
+        const worker = await ocrWorker();
+        if (worker) {
+            const result = await worker.recognize(enhanced);
+
+            return (result?.data?.text || '').trim();
+        }
+
+        if (typeof Tesseract.recognize === 'function') {
+            const result = await Tesseract.recognize(enhanced, 'eng');
+
+            return (result?.data?.text || '').trim();
+        }
     } catch {
         return '';
     }
+
+    return '';
+}
+
+function luma(data, index) {
+    return (data[index] * 0.299) + (data[index + 1] * 0.587) + (data[index + 2] * 0.114);
+}
+
+function analyzeFrame(video, scratch, previous) {
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (! width || ! height) {
+        return null;
+    }
+
+    const context = scratch.getContext('2d', { willReadFrequently: true });
+    if (! context) {
+        return null;
+    }
+
+    scratch.width = SAMPLE_WIDTH;
+    scratch.height = SAMPLE_HEIGHT;
+    context.drawImage(
+        video,
+        width * FRAME_X,
+        height * FRAME_Y,
+        width * FRAME_W,
+        height * FRAME_H,
+        0,
+        0,
+        SAMPLE_WIDTH,
+        SAMPLE_HEIGHT,
+    );
+
+    const { data } = context.getImageData(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT);
+    const pixels = SAMPLE_WIDTH * SAMPLE_HEIGHT;
+    let sum = 0;
+    let sumSq = 0;
+    let edge = 0;
+    let motion = 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+        const value = luma(data, i);
+        sum += value;
+        sumSq += value * value;
+    }
+
+    for (let y = 1; y < SAMPLE_HEIGHT - 1; y += 2) {
+        for (let x = 1; x < SAMPLE_WIDTH - 1; x += 2) {
+            const index = ((y * SAMPLE_WIDTH) + x) * 4;
+            const center = luma(data, index);
+            const right = luma(data, index + 4);
+            const down = luma(data, ((y + 1) * SAMPLE_WIDTH + x) * 4);
+            edge += Math.abs(center - right) + Math.abs(center - down);
+        }
+    }
+
+    if (previous) {
+        for (let i = 0; i < data.length; i += 16) {
+            motion += Math.abs(luma(data, i) - luma(previous, i));
+        }
+        motion /= (data.length / 16);
+    } else {
+        motion = MOTION_LIMIT + 1;
+    }
+
+    const mean = sum / pixels;
+    const variance = (sumSq / pixels) - (mean * mean);
+    const sharp = edge / pixels;
+
+    return {
+        mean,
+        variance,
+        sharp,
+        motion,
+        data,
+        aligned: mean > 50 && mean < 220 && variance > 280 && sharp > 4.2,
+        still: motion < MOTION_LIMIT,
+        empty: mean < 42 || variance < 90,
+    };
 }
 
 function boot() {
@@ -82,14 +231,19 @@ function boot() {
     const video = document.getElementById('card-video');
     const canvas = document.getElementById('card-canvas');
     const preview = document.getElementById('card-preview');
-    const shutter = document.getElementById('shutter');
-    const retake = document.getElementById('card-retake');
+    const frame = document.querySelector('.card-scan-frame');
     const fileInput = document.getElementById('card-file');
     const status = document.getElementById('card-scan-status');
     const storeUrl = root.dataset.store;
     const token = root.dataset.csrf;
+    const scratch = document.createElement('canvas');
     let stream = null;
     let busy = false;
+    let watching = false;
+    let armed = true;
+    let stableCount = 0;
+    let previousSample = null;
+    let watchTimer = null;
 
     const setStatus = (message) => {
         if (status) {
@@ -97,20 +251,168 @@ function boot() {
         }
     };
 
+    const setReady = (ready) => {
+        frame?.classList.toggle('is-ready', ready);
+        root.classList.toggle('is-locked', ready);
+    };
+
     const showPreview = (url) => {
         preview.src = url;
         preview.hidden = false;
         video.hidden = true;
-        retake.hidden = false;
-        shutter.hidden = true;
+        setReady(false);
     };
 
     const showLive = () => {
         preview.hidden = true;
         preview.removeAttribute('src');
         video.hidden = false;
-        retake.hidden = true;
-        shutter.hidden = false;
+    };
+
+    const ocrQueue = [];
+    let ocrBusy = false;
+
+    const sendOcr = async (ocrUrl, source) => {
+        const ocrText = await readText(source);
+        const fields = parseOcr(ocrText);
+        await fetch(ocrUrl, {
+            method: 'PATCH',
+            headers: {
+                ...csrfHeaders(token),
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ ocr_text: ocrText, ...fields }),
+        });
+    };
+
+    const pumpOcr = async () => {
+        if (ocrBusy) {
+            return;
+        }
+        const job = ocrQueue.shift();
+        if (! job) {
+            return;
+        }
+        ocrBusy = true;
+        try {
+            await sendOcr(job.ocrUrl, job.source);
+        } catch {
+            // The photo is already on the desk; staff can type what OCR missed.
+        } finally {
+            ocrBusy = false;
+            pumpOcr();
+        }
+    };
+
+    const captureFrame = () => new Promise((resolve, reject) => {
+        const width = video.videoWidth || 1280;
+        const height = video.videoHeight || 720;
+        canvas.width = Math.max(1, Math.round(width * FRAME_W));
+        canvas.height = Math.max(1, Math.round(height * FRAME_H));
+        const context = canvas.getContext('2d');
+        if (! context) {
+            reject(new Error('canvas'));
+            return;
+        }
+        context.drawImage(
+            video,
+            width * FRAME_X,
+            height * FRAME_Y,
+            width * FRAME_W,
+            height * FRAME_H,
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+        );
+        resolve(canvas.toDataURL('image/jpeg', 0.88));
+    });
+
+    const upload = async (imageBase64, previewUrl = imageBase64) => {
+        busy = true;
+        armed = false;
+        stableCount = 0;
+        showPreview(previewUrl);
+        setStatus('Saving the photo…');
+
+        try {
+            const response = await fetch(storeUrl, {
+                method: 'POST',
+                headers: {
+                    ...csrfHeaders(token),
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ image_base64: imageBase64 }),
+            });
+            if (! response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload.message || 'Upload failed.');
+            }
+            const payload = await response.json();
+            if (payload.ocr_url) {
+                ocrQueue.push({ ocrUrl: payload.ocr_url, source: imageBase64 });
+                pumpOcr();
+            }
+            setStatus('Saved. Lift the card, then hold the next one.');
+            window.setTimeout(() => {
+                showLive();
+                busy = false;
+                setStatus('Waiting for the next card.');
+            }, 450);
+        } catch (error) {
+            setStatus(error.message || 'Could not send that photo. Hold the card in the frame again.');
+            showLive();
+            busy = false;
+            armed = true;
+        }
+    };
+
+    const watch = () => {
+        if (busy || video.hidden || ! watching) {
+            return;
+        }
+
+        const sample = analyzeFrame(video, scratch, previousSample);
+        if (! sample) {
+            return;
+        }
+        previousSample = sample.data;
+
+        if (! armed) {
+            if (sample.empty || ! sample.aligned) {
+                armed = true;
+                stableCount = 0;
+                setStatus('Hold the next card in the frame.');
+            }
+            return;
+        }
+
+        if (sample.aligned && sample.still) {
+            stableCount += 1;
+            setReady(true);
+            setStatus('Hold still…');
+            if (stableCount >= STABLE_FRAMES) {
+                busy = true;
+                armed = false;
+                captureFrame().then(upload).catch(() => {
+                    setStatus('Could not capture that frame. Hold the card steady.');
+                    busy = false;
+                    armed = true;
+                    setReady(false);
+                });
+            }
+            return;
+        }
+
+        stableCount = 0;
+        setReady(false);
+        if (sample.aligned) {
+            setStatus('Keep the card still.');
+        } else {
+            setStatus('Fill the frame with the card.');
+        }
     };
 
     const startCamera = async () => {
@@ -126,97 +428,29 @@ function boot() {
             });
             video.srcObject = stream;
             await video.play();
-            setStatus('Align the card, then tap the shutter.');
+            watching = true;
+            setStatus('Fill the frame with the card. It captures by itself.');
+            watchTimer = window.setInterval(watch, 120);
         } catch {
             setStatus('Camera permission was denied. You can still pick a photo from Album.');
         }
     };
 
-    const captureFrame = () => new Promise((resolve, reject) => {
-        const width = video.videoWidth || 1280;
-        const height = video.videoHeight || 720;
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext('2d');
-        if (! context) {
-            reject(new Error('canvas'));
-            return;
-        }
-        context.drawImage(video, 0, 0, width, height);
-        canvas.toBlob((blob) => {
-            if (blob) {
-                resolve(blob);
-            } else {
-                reject(new Error('blob'));
-            }
-        }, 'image/jpeg', 0.86);
-    });
-
-    const upload = async (blob) => {
-        if (busy) {
-            return;
-        }
-        busy = true;
-        showPreview(URL.createObjectURL(blob));
-        setStatus('Reading the card…');
-
-        const ocrText = await readText(blob);
-        const fields = parseOcr(ocrText);
-        const body = new FormData();
-        body.append('image', blob, 'card.jpg');
-        body.append('ocr_text', ocrText);
-        Object.entries(fields).forEach(([key, value]) => {
-            if (value) {
-                body.append(key, value);
-            }
-        });
-
-        setStatus('Sending to the desk…');
-
-        try {
-            const response = await fetch(storeUrl, {
-                method: 'POST',
-                headers: csrfHeaders(token),
-                body,
-                credentials: 'same-origin',
-            });
-            if (! response.ok) {
-                const payload = await response.json().catch(() => ({}));
-                throw new Error(payload.message || 'Upload failed.');
-            }
-            setStatus('Saved on the desk. Photograph the next card.');
-            window.setTimeout(() => {
-                showLive();
-                setStatus('Align the next card, then tap the shutter.');
-            }, 1200);
-        } catch (error) {
-            setStatus(error.message || 'Could not send that photo. Try again.');
-            retake.hidden = false;
-        } finally {
-            busy = false;
-        }
-    };
-
-    shutter?.addEventListener('click', async () => {
-        try {
-            const blob = await captureFrame();
-            await upload(blob);
-        } catch {
-            setStatus('Could not capture that frame. Try Album instead.');
-        }
-    });
-
-    retake?.addEventListener('click', () => {
-        showLive();
-        setStatus('Align the card, then tap the shutter.');
-    });
-
     fileInput?.addEventListener('change', async () => {
         const file = fileInput.files?.[0];
         fileInput.value = '';
-        if (file) {
-            await upload(file);
+        if (! file || busy) {
+            return;
         }
+        const dataUrl = await dataUrlFromBlob(file);
+        await upload(dataUrl);
+    });
+
+    window.addEventListener('pagehide', () => {
+        if (watchTimer) {
+            window.clearInterval(watchTimer);
+        }
+        stream?.getTracks().forEach((track) => track.stop());
     });
 
     startCamera();

@@ -17,15 +17,8 @@ class StoreCapturedBusinessCardRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
-            'ocr_text' => ['nullable', 'string', 'max:20000'],
-            'full_name' => ['nullable', 'string', 'max:120'],
-            'job_title' => ['nullable', 'string', 'max:120'],
-            'company_name' => ['nullable', 'string', 'max:160'],
-            'email' => ['nullable', 'string', 'max:160'],
-            'phone' => ['nullable', 'string', 'max:40'],
-            'website' => ['nullable', 'string', 'max:200'],
-            'address' => ['nullable', 'string', 'max:255'],
+            'image' => ['required_without:image_base64', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
+            'image_base64' => ['required_without:image', 'nullable', 'string', 'max:8000000'],
         ];
     }
 }

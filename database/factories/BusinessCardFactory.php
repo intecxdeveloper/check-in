@@ -20,7 +20,9 @@ class BusinessCardFactory extends Factory
         return [
             'user_id' => User::factory(),
             'scan_session_id' => BusinessCardScanSession::factory(),
-            'image_path' => 'business-cards/example.webp',
+            'image_path' => null,
+            'image_base64' => base64_encode('RIFF....WEBP'),
+            'image_mime' => 'image/webp',
             'full_name' => fake()->name(),
             'job_title' => 'Director',
             'company_name' => fake()->company(),

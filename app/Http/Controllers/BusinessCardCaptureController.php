@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreBusinessCardOcrRequest;
 use App\Http\Requests\StoreCapturedBusinessCardRequest;
 use App\Models\BusinessCard;
 use App\Models\BusinessCardScanSession;
@@ -26,15 +27,40 @@ class BusinessCardCaptureController extends Controller
     public function store(StoreCapturedBusinessCardRequest $request, string $token): JsonResponse
     {
         $session = $this->usableSession($token);
-        $data = $request->validated();
-        $path = BusinessCardImage::store($request->file('image'));
+        $encoded = $this->encodedImage($request);
 
-        if ($path === null) {
+        if ($encoded === null) {
             return response()->json([
                 'message' => 'That photo could not be read. Try again in better light.',
             ], 422);
         }
 
+        $card = BusinessCard::query()->create([
+            'user_id' => $session->user_id,
+            'scan_session_id' => $session->id,
+            'image_path' => null,
+            'image_base64' => $encoded['base64'],
+            'image_mime' => $encoded['mime'],
+        ]);
+
+        $session->forceFill(['last_seen_at' => now()])->save();
+
+        return response()->json([
+            'ok' => true,
+            'card' => $card->toGalleryArray(),
+            'ocr_url' => url('/scan/'.$token.'/cards/'.$card->id),
+        ], 201);
+    }
+
+    public function ocr(StoreBusinessCardOcrRequest $request, string $token, BusinessCard $businessCard): JsonResponse
+    {
+        $session = $this->usableSession($token);
+
+        if ($businessCard->scan_session_id !== $session->id) {
+            abort(404);
+        }
+
+        $data = $request->validated();
         $ocrText = trim((string) ($data['ocr_text'] ?? ''));
         $fields = BusinessCardParser::fillBlanks([
             'full_name' => $data['full_name'] ?? null,
@@ -46,26 +72,35 @@ class BusinessCardCaptureController extends Controller
             'address' => $data['address'] ?? null,
         ], $ocrText);
 
-        $card = BusinessCard::query()->create([
-            'user_id' => $session->user_id,
-            'scan_session_id' => $session->id,
-            'image_path' => $path,
-            'full_name' => $fields['full_name'] ?: null,
-            'job_title' => $fields['job_title'] ?: null,
-            'company_name' => $fields['company_name'] ?: null,
-            'email' => $fields['email'] ?: null,
-            'phone' => $fields['phone'] ?: null,
-            'website' => $fields['website'] ?: null,
-            'address' => $fields['address'] ?: null,
-            'ocr_text' => $ocrText !== '' ? $ocrText : null,
+        $businessCard->update([
+            'full_name' => $fields['full_name'] ?: $businessCard->full_name,
+            'job_title' => $fields['job_title'] ?: $businessCard->job_title,
+            'company_name' => $fields['company_name'] ?: $businessCard->company_name,
+            'email' => $fields['email'] ?: $businessCard->email,
+            'phone' => $fields['phone'] ?: $businessCard->phone,
+            'website' => $fields['website'] ?: $businessCard->website,
+            'address' => $fields['address'] ?: $businessCard->address,
+            'ocr_text' => $ocrText !== '' ? $ocrText : $businessCard->ocr_text,
         ]);
-
-        $session->forceFill(['last_seen_at' => now()])->save();
 
         return response()->json([
             'ok' => true,
-            'card' => $card->toGalleryArray(),
-        ], 201);
+            'card' => $businessCard->fresh()->toGalleryArray(),
+        ]);
+    }
+
+    /**
+     * @return array{base64: string, mime: string}|null
+     */
+    private function encodedImage(StoreCapturedBusinessCardRequest $request): ?array
+    {
+        if ($request->hasFile('image')) {
+            return BusinessCardImage::fromUpload($request->file('image'));
+        }
+
+        $uri = trim((string) $request->input('image_base64', ''));
+
+        return $uri !== '' ? BusinessCardImage::fromDataUri($uri) : null;
     }
 
     private function usableSession(string $token): BusinessCardScanSession

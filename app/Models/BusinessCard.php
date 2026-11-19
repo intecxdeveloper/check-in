@@ -6,7 +6,6 @@ use Database\Factories\BusinessCardFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class BusinessCard extends Model
 {
@@ -17,6 +16,8 @@ class BusinessCard extends Model
         'user_id',
         'scan_session_id',
         'image_path',
+        'image_base64',
+        'image_mime',
         'full_name',
         'job_title',
         'company_name',
@@ -26,6 +27,10 @@ class BusinessCard extends Model
         'address',
         'ocr_text',
         'notes',
+    ];
+
+    protected $hidden = [
+        'image_base64',
     ];
 
     public function user(): BelongsTo
@@ -40,11 +45,22 @@ class BusinessCard extends Model
 
     public function imageUrl(): ?string
     {
-        if (! filled($this->image_path)) {
+        if (! filled($this->image_base64) && ! filled($this->image_path)) {
             return null;
         }
 
-        return Storage::disk('public')->url($this->image_path);
+        return route('staff.cards.image', $this);
+    }
+
+    public function imageBinary(): ?string
+    {
+        if (! filled($this->image_base64)) {
+            return null;
+        }
+
+        $bytes = base64_decode((string) $this->image_base64, true);
+
+        return $bytes === false ? null : $bytes;
     }
 
     public function displayName(): string

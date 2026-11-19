@@ -67,6 +67,7 @@ class SecurityTest extends TestCase
         $this->get('/staff/visitors')->assertRedirect('/staff/login');
         $this->get('/staff/cards')->assertRedirect('/staff/login');
         $this->get('/staff/cards/feed')->assertRedirect('/staff/login');
+        $this->get('/staff/cards/1/image')->assertRedirect('/staff/login');
         $this->get('/staff/gifts')->assertRedirect('/staff/login');
         $this->get('/staff/export')->assertRedirect('/staff/login');
         $visitor = $this->makeVisitor(true);
