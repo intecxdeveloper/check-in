@@ -72,6 +72,17 @@ class BusinessCardCaptureController extends Controller
             'address' => $data['address'] ?? null,
         ], $ocrText);
 
+        $upright = filled($data['image_base64'] ?? null)
+            ? BusinessCardImage::fromDataUri((string) $data['image_base64'])
+            : null;
+
+        if ($upright !== null) {
+            $businessCard->fill([
+                'image_base64' => $upright['base64'],
+                'image_mime' => $upright['mime'],
+            ]);
+        }
+
         $businessCard->update([
             'full_name' => $fields['full_name'] ?: $businessCard->full_name,
             'job_title' => $fields['job_title'] ?: $businessCard->job_title,

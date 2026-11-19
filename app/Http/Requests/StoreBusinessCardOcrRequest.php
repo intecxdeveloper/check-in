@@ -25,6 +25,7 @@ class StoreBusinessCardOcrRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:40'],
             'website' => ['nullable', 'string', 'max:200'],
             'address' => ['nullable', 'string', 'max:255'],
+            'image_base64' => ['nullable', 'string', 'max:8000000'],
         ];
     }
 }

@@ -126,6 +126,26 @@ class BusinessCardScanTest extends TestCase
         $this->assertSame($session->id, $card->fresh()->scan_session_id);
     }
 
+    public function test_phone_ocr_replaces_the_photo_with_the_upright_version(): void
+    {
+        $token = Str::lower(Str::random(32));
+        BusinessCardScanSession::factory()->withToken($token)->create();
+        $sideways = UploadedFile::fake()->image('card.jpg', 450, 800);
+        $upright = UploadedFile::fake()->image('card.jpg', 800, 450);
+        $toDataUri = fn (UploadedFile $file): string => 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($file->getRealPath()));
+
+        $store = $this->postJson('/scan/'.$token, ['image_base64' => $toDataUri($sideways)])->assertCreated();
+        $card = BusinessCard::query()->findOrFail($store->json('card.id'));
+
+        $this->patchJson('/scan/'.$token.'/cards/'.$card->id, [
+            'ocr_text' => 'Aina Rahman',
+            'image_base64' => $toDataUri($upright),
+        ])->assertOk();
+
+        [$width, $height] = getimagesizefromstring((string) $card->fresh()->imageBinary());
+        $this->assertGreaterThan($height, $width);
+    }
+
     public function test_phone_upload_rejects_a_non_image(): void
     {
         Storage::fake('public');

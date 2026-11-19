@@ -3,13 +3,12 @@ const PHONE = /(?:\+?\s*6\s*0|0)\s*1\d(?:[\s-]?\d){7,8}|\+\d{1,3}[\s-]?(?:\d[\s-
 const WEBSITE = /(?:https?:\/\/|www\.)[^\s<>]+/i;
 
 const SAMPLE_WIDTH = 160;
-const SAMPLE_HEIGHT = 90;
+const SAMPLE_HEIGHT = 92;
 const STABLE_FRAMES = 6;
 const MOTION_LIMIT = 14;
-const FRAME_X = 0.07;
-const FRAME_Y = 0.18;
-const FRAME_W = 0.86;
-const FRAME_H = 0.64;
+const CARD_MARGIN = 0.06;
+const OCR_MAX_EDGE = 2000;
+const OCR_ROTATIONS = [0, 180, 90, 270];
 
 function parseOcr(text) {
     const fields = {
@@ -77,81 +76,207 @@ function dataUrlFromBlob(blob) {
     });
 }
 
-function enhanceForOcr(source) {
-    return createImageBitmap(source).then((bitmap) => {
-        const scale = Math.min(2, 1400 / Math.max(bitmap.width, 1));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-        const context = canvas.getContext('2d');
-        if (! context) {
-            bitmap.close();
-
-            return source;
-        }
-        context.filter = 'grayscale(1) contrast(1.45) brightness(1.08)';
-        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-        bitmap.close();
-
-        return canvas;
-    }).catch(() => source);
-}
-
-let ocrWorkerPromise = null;
-
-function ocrWorker() {
-    const Tesseract = window.Tesseract;
-    if (! Tesseract?.createWorker) {
-        return null;
-    }
-
-    if (! ocrWorkerPromise) {
-        ocrWorkerPromise = Tesseract.createWorker('eng', 1).then(async (worker) => {
-            await worker.setParameters({ tessedit_pageseg_mode: '6' });
-
-            return worker;
-        });
-    }
-
-    return ocrWorkerPromise;
-}
-
-async function readText(source) {
-    const Tesseract = window.Tesseract;
-    if (! Tesseract) {
-        return '';
-    }
-
-    const enhanced = await enhanceForOcr(source);
-
-    try {
-        const worker = await ocrWorker();
-        if (worker) {
-            const result = await worker.recognize(enhanced);
-
-            return (result?.data?.text || '').trim();
-        }
-
-        if (typeof Tesseract.recognize === 'function') {
-            const result = await Tesseract.recognize(enhanced, 'eng');
-
-            return (result?.data?.text || '').trim();
-        }
-    } catch {
-        return '';
-    }
-
-    return '';
+function loadImage(src) {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('image'));
+        image.src = src;
+    });
 }
 
 function luma(data, index) {
     return (data[index] * 0.299) + (data[index + 1] * 0.587) + (data[index + 2] * 0.114);
 }
 
-function analyzeFrame(video, scratch, previous) {
-    const width = video.videoWidth;
-    const height = video.videoHeight;
-    if (! width || ! height) {
+/**
+ * Maps the on-screen guide frame to video pixels. The video is shown with
+ * object-fit: cover, so the visible area is a scaled, centred slice of the stream.
+ */
+function frameRegion(video, frame) {
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+    if (! videoWidth || ! videoHeight || ! frame) {
+        return null;
+    }
+
+    const view = video.getBoundingClientRect();
+    const box = frame.getBoundingClientRect();
+    if (! view.width || ! view.height || ! box.width || ! box.height) {
+        return null;
+    }
+
+    const scale = Math.max(view.width / videoWidth, view.height / videoHeight);
+    const offsetX = (view.width - (videoWidth * scale)) / 2;
+    const offsetY = (view.height - (videoHeight * scale)) / 2;
+    const padX = box.width * CARD_MARGIN;
+    const padY = box.height * CARD_MARGIN;
+
+    const sx = Math.max(0, (box.left - padX - view.left - offsetX) / scale);
+    const sy = Math.max(0, (box.top - padY - view.top - offsetY) / scale);
+    const sw = Math.min(videoWidth - sx, (box.width + (padX * 2)) / scale);
+    const sh = Math.min(videoHeight - sy, (box.height + (padY * 2)) / scale);
+
+    return { sx, sy, sw, sh };
+}
+
+function rotatedCanvas(image, rotation, maxEdge) {
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const scale = Math.min(2.5, maxEdge / Math.max(sourceWidth, sourceHeight, 1));
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const quarterTurn = rotation % 180 !== 0;
+    const canvas = document.createElement('canvas');
+    canvas.width = quarterTurn ? height : width;
+    canvas.height = quarterTurn ? width : height;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (! context) {
+        return null;
+    }
+
+    context.translate(canvas.width / 2, canvas.height / 2);
+    context.rotate((rotation * Math.PI) / 180);
+    context.drawImage(image, -width / 2, -height / 2, width, height);
+
+    return canvas;
+}
+
+/**
+ * Greyscale plus a 2–98% contrast stretch done on pixels, because canvas
+ * `filter` is ignored by iOS Safari.
+ */
+function ocrCanvas(image, rotation) {
+    const canvas = rotatedCanvas(image, rotation, OCR_MAX_EDGE);
+    const context = canvas?.getContext('2d', { willReadFrequently: true });
+    if (! canvas || ! context) {
+        return null;
+    }
+
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+    const { data } = pixels;
+    const histogram = new Uint32Array(256);
+    const total = canvas.width * canvas.height;
+
+    for (let i = 0; i < data.length; i += 4) {
+        const value = Math.round(luma(data, i));
+        data[i] = value;
+        histogram[value] += 1;
+    }
+
+    let low = 0;
+    let high = 255;
+    let running = 0;
+    for (let value = 0; value < 256; value += 1) {
+        running += histogram[value];
+        if (running >= total * 0.02) {
+            low = value;
+            break;
+        }
+    }
+    running = 0;
+    for (let value = 255; value >= 0; value -= 1) {
+        running += histogram[value];
+        if (running >= total * 0.02) {
+            high = value;
+            break;
+        }
+    }
+
+    const range = Math.max(1, high - low);
+    for (let i = 0; i < data.length; i += 4) {
+        const stretched = Math.max(0, Math.min(255, ((data[i] - low) * 255) / range));
+        data[i] = stretched;
+        data[i + 1] = stretched;
+        data[i + 2] = stretched;
+    }
+    context.putImageData(pixels, 0, 0);
+
+    return canvas;
+}
+
+function waitForTesseract(timeoutMs = 20000) {
+    return new Promise((resolve) => {
+        const started = Date.now();
+        const check = () => {
+            if (window.Tesseract?.createWorker) {
+                resolve(window.Tesseract);
+            } else if (Date.now() - started > timeoutMs) {
+                resolve(null);
+            } else {
+                window.setTimeout(check, 200);
+            }
+        };
+        check();
+    });
+}
+
+let ocrWorkerPromise = null;
+
+function ocrWorker() {
+    if (! ocrWorkerPromise) {
+        ocrWorkerPromise = waitForTesseract().then(async (Tesseract) => {
+            if (! Tesseract) {
+                return null;
+            }
+
+            const worker = await Tesseract.createWorker('eng', 1, { logger: () => {} });
+            await worker.setParameters({
+                tessedit_pageseg_mode: '11',
+                preserve_interword_spaces: '1',
+            });
+
+            return worker;
+        }).catch(() => null);
+    }
+
+    return ocrWorkerPromise;
+}
+
+function scoreText(text, confidence) {
+    const words = (text.match(/[A-Za-z]{3,}/g) || []).length;
+
+    return { words, score: confidence + (words * 3) };
+}
+
+/**
+ * Tries the card upright first and only turns it when the text looks like noise,
+ * so a card held upside down or sideways still reads.
+ */
+async function readCard(source) {
+    const worker = await ocrWorker();
+    if (! worker) {
+        return null;
+    }
+
+    const image = await loadImage(source);
+    let best = null;
+
+    for (const rotation of OCR_ROTATIONS) {
+        const canvas = ocrCanvas(image, rotation);
+        if (! canvas) {
+            continue;
+        }
+
+        const { data } = await worker.recognize(canvas);
+        const text = (data?.text || '').trim();
+        const confidence = Number(data?.confidence || 0);
+        const { words, score } = scoreText(text, confidence);
+
+        if (! best || score > best.score) {
+            best = { rotation, text, score };
+        }
+
+        if (confidence >= 60 && words >= 3) {
+            break;
+        }
+    }
+
+    return best ? { ...best, image } : null;
+}
+
+function analyzeFrame(video, region, scratch, previous) {
+    if (! region) {
         return null;
     }
 
@@ -162,17 +287,7 @@ function analyzeFrame(video, scratch, previous) {
 
     scratch.width = SAMPLE_WIDTH;
     scratch.height = SAMPLE_HEIGHT;
-    context.drawImage(
-        video,
-        width * FRAME_X,
-        height * FRAME_Y,
-        width * FRAME_W,
-        height * FRAME_H,
-        0,
-        0,
-        SAMPLE_WIDTH,
-        SAMPLE_HEIGHT,
-    );
+    context.drawImage(video, region.sx, region.sy, region.sw, region.sh, 0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT);
 
     const { data } = context.getImageData(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT);
     const pixels = SAMPLE_WIDTH * SAMPLE_HEIGHT;
@@ -211,10 +326,6 @@ function analyzeFrame(video, scratch, previous) {
     const sharp = edge / pixels;
 
     return {
-        mean,
-        variance,
-        sharp,
-        motion,
         data,
         aligned: mean > 50 && mean < 220 && variance > 280 && sharp > 4.2,
         still: motion < MOTION_LIMIT,
@@ -234,9 +345,11 @@ function boot() {
     const frame = document.querySelector('.card-scan-frame');
     const fileInput = document.getElementById('card-file');
     const status = document.getElementById('card-scan-status');
+    const ocrStatus = document.getElementById('card-ocr-status');
     const storeUrl = root.dataset.store;
     const token = root.dataset.csrf;
     const scratch = document.createElement('canvas');
+    const ocrQueue = [];
     let stream = null;
     let busy = false;
     let watching = false;
@@ -244,6 +357,8 @@ function boot() {
     let stableCount = 0;
     let previousSample = null;
     let watchTimer = null;
+    let ocrBusy = false;
+    let cardsRead = 0;
 
     const setStatus = (message) => {
         if (status) {
@@ -251,9 +366,14 @@ function boot() {
         }
     };
 
+    const setOcrStatus = (message) => {
+        if (ocrStatus) {
+            ocrStatus.textContent = message;
+        }
+    };
+
     const setReady = (ready) => {
         frame?.classList.toggle('is-ready', ready);
-        root.classList.toggle('is-locked', ready);
     };
 
     const showPreview = (url) => {
@@ -269,12 +389,22 @@ function boot() {
         video.hidden = false;
     };
 
-    const ocrQueue = [];
-    let ocrBusy = false;
-
     const sendOcr = async (ocrUrl, source) => {
-        const ocrText = await readText(source);
-        const fields = parseOcr(ocrText);
+        const result = await readCard(source);
+        if (! result) {
+            setOcrStatus('Text reader did not load. Photos still save; type details on the desk.');
+
+            return;
+        }
+
+        const body = { ocr_text: result.text, ...parseOcr(result.text) };
+        if (result.rotation !== 0) {
+            const upright = rotatedCanvas(result.image, result.rotation, 1600);
+            if (upright) {
+                body.image_base64 = upright.toDataURL('image/jpeg', 0.9);
+            }
+        }
+
         await fetch(ocrUrl, {
             method: 'PATCH',
             headers: {
@@ -282,8 +412,14 @@ function boot() {
                 'Content-Type': 'application/json',
             },
             credentials: 'same-origin',
-            body: JSON.stringify({ ocr_text: ocrText, ...fields }),
+            body: JSON.stringify(body),
         });
+
+        cardsRead += 1;
+        const name = body.full_name || body.company_name;
+        setOcrStatus(name
+            ? `Read: ${name}`
+            : `Card ${cardsRead} saved. No clear text, so check it on the desk.`);
     };
 
     const pumpOcr = async () => {
@@ -295,45 +431,40 @@ function boot() {
             return;
         }
         ocrBusy = true;
+        setOcrStatus(ocrQueue.length > 0 ? `Reading text… ${ocrQueue.length + 1} cards waiting` : 'Reading text…');
         try {
             await sendOcr(job.ocrUrl, job.source);
         } catch {
-            // The photo is already on the desk; staff can type what OCR missed.
+            setOcrStatus('Could not read that card. The photo is still on the desk.');
         } finally {
             ocrBusy = false;
             pumpOcr();
         }
     };
 
-    const captureFrame = () => new Promise((resolve, reject) => {
-        const width = video.videoWidth || 1280;
-        const height = video.videoHeight || 720;
-        canvas.width = Math.max(1, Math.round(width * FRAME_W));
-        canvas.height = Math.max(1, Math.round(height * FRAME_H));
+    const captureFrame = () => {
+        const region = frameRegion(video, frame) ?? {
+            sx: 0,
+            sy: 0,
+            sw: video.videoWidth || 1280,
+            sh: video.videoHeight || 720,
+        };
+        canvas.width = Math.max(1, Math.round(region.sw));
+        canvas.height = Math.max(1, Math.round(region.sh));
         const context = canvas.getContext('2d');
         if (! context) {
-            reject(new Error('canvas'));
-            return;
+            throw new Error('canvas');
         }
-        context.drawImage(
-            video,
-            width * FRAME_X,
-            height * FRAME_Y,
-            width * FRAME_W,
-            height * FRAME_H,
-            0,
-            0,
-            canvas.width,
-            canvas.height,
-        );
-        resolve(canvas.toDataURL('image/jpeg', 0.88));
-    });
+        context.drawImage(video, region.sx, region.sy, region.sw, region.sh, 0, 0, canvas.width, canvas.height);
 
-    const upload = async (imageBase64, previewUrl = imageBase64) => {
+        return canvas.toDataURL('image/jpeg', 0.9);
+    };
+
+    const upload = async (imageBase64) => {
         busy = true;
         armed = false;
         stableCount = 0;
-        showPreview(previewUrl);
+        showPreview(imageBase64);
         setStatus('Saving the photo…');
 
         try {
@@ -374,7 +505,7 @@ function boot() {
             return;
         }
 
-        const sample = analyzeFrame(video, scratch, previousSample);
+        const sample = analyzeFrame(video, frameRegion(video, frame), scratch, previousSample);
         if (! sample) {
             return;
         }
@@ -386,6 +517,7 @@ function boot() {
                 stableCount = 0;
                 setStatus('Hold the next card in the frame.');
             }
+
             return;
         }
 
@@ -396,40 +528,44 @@ function boot() {
             if (stableCount >= STABLE_FRAMES) {
                 busy = true;
                 armed = false;
-                captureFrame().then(upload).catch(() => {
+                try {
+                    upload(captureFrame());
+                } catch {
                     setStatus('Could not capture that frame. Hold the card steady.');
                     busy = false;
                     armed = true;
                     setReady(false);
-                });
+                }
             }
+
             return;
         }
 
         stableCount = 0;
         setReady(false);
-        if (sample.aligned) {
-            setStatus('Keep the card still.');
-        } else {
-            setStatus('Fill the frame with the card.');
-        }
+        setStatus(sample.aligned ? 'Keep the card still.' : 'Lay the card flat inside the frame.');
     };
 
     const startCamera = async () => {
         if (! navigator.mediaDevices?.getUserMedia) {
             setStatus('This browser cannot open the camera. Use Album instead.');
+
             return;
         }
 
         try {
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } },
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 2560 },
+                    height: { ideal: 1440 },
+                },
                 audio: false,
             });
             video.srcObject = stream;
             await video.play();
             watching = true;
-            setStatus('Fill the frame with the card. It captures by itself.');
+            setStatus('Lay the card flat inside the frame. It captures by itself.');
             watchTimer = window.setInterval(watch, 120);
         } catch {
             setStatus('Camera permission was denied. You can still pick a photo from Album.');
@@ -454,6 +590,7 @@ function boot() {
     });
 
     startCamera();
+    ocrWorker();
 }
 
 if (document.readyState === 'loading') {

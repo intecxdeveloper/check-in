@@ -2706,6 +2706,7 @@ body.checkin-map-is-expanded .checkin-actions {
     overflow: hidden;
     border-radius: 1.5rem;
     background: #000;
+    container-type: size;
 }
 
 .card-scan-view video,
@@ -2718,9 +2719,18 @@ body.checkin-map-is-expanded .checkin-actions {
     object-fit: cover;
 }
 
+.card-scan-view img {
+    object-fit: contain;
+}
+
+/* Landscape card guide (ISO business card ratio) so cards are held upright. */
 .card-scan-frame {
     position: absolute;
-    inset: 18% 7%;
+    top: 45%;
+    left: 50%;
+    width: min(90cqw, 72cqh * 1.75);
+    aspect-ratio: 1.75 / 1;
+    transform: translate(-50%, -50%);
     border: 2px solid rgba(255, 255, 255, 0.88);
     border-radius: 1rem;
     box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.28);
